@@ -22,7 +22,7 @@ export interface ToolResult {
 /**
  * Permission rule for tool access control
  */
-export interface Permission {
+export interface ToolPermission {
   resourceType: 'file' | 'directory' | 'command';
   pattern: string;
   action: 'allow' | 'deny' | 'ask';
@@ -38,7 +38,7 @@ export interface ToolDefinition {
   inputSchema: z.ZodTypeAny;
   outputSchema: z.ZodTypeAny;
   handler: (input: unknown) => Promise<ToolResult>;
-  permissions?: Permission[];
+  permissions?: ToolPermission[];
   rateLimit?: number;
   enabled?: boolean;
   dangerous?: boolean;
@@ -57,7 +57,7 @@ export interface ToolExecutionContext {
   sessionId: string;
   userId?: string;
   projectId?: string;
-  permissions: Permission[];
+  permissions: ToolPermission[];
 }
 
 /**

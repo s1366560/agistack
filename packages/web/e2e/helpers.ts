@@ -1,24 +1,24 @@
 /**
- * E2E 测试全局设置和 Fixtures
+ * E2E Test Helpers and Utilities
  *
- * 提供测试辅助函数和全局配置
+ * Provides test helper functions and global configuration
  */
 
-import { test as base } from '@playwright/test'
+import { test as base, type Page } from '@playwright/test'
 
-// 定义测试辅助函数
+// Define custom test fixtures
 export const test = base.extend({
-  // 自定义页面对象
+  // Custom page setup with error logging
   page: async ({ page }, use) => {
-    // 设置默认超时
+    // Set default timeout
     page.setDefaultTimeout(10000)
 
-    // 监听页面错误
+    // Listen for page errors
     page.on('pageerror', (error) => {
       console.error('Page error:', error)
     })
 
-    // 监听控制台消息
+    // Listen for console messages
     page.on('console', (msg) => {
       if (msg.type() === 'error') {
         console.error('Console error:', msg.text())
@@ -30,72 +30,28 @@ export const test = base.extend({
 })
 
 /**
- * 测试辅助函数
+ * Test helper class for common operations
  */
 export class TestHelpers {
   constructor(private page: Page) {}
 
   /**
-   * 登录用户
+   * Navigate to home page
    */
-  async login(email = 'test@example.com', password = 'password123') {
-    await this.page.goto('/login')
-    await this.page.fill('input[name="email"]', email)
-    await this.page.fill('input[name="password"]', password)
-    await this.page.click('button[type="submit"]')
-    await this.page.waitForURL('/', { timeout: 5000 })
+  async gotoHome() {
+    await this.page.goto('/')
+    await this.page.waitForLoadState('networkidle')
   }
 
   /**
-   * 创建测试会话
-   */
-  async createSession() {
-    await this.page.click('button:has-text("新建对话")')
-    await this.page.waitForURL(/\/chat\/.*/, { timeout: 5000 })
-  }
-
-  /**
-   * 发送消息
-   */
-  async sendMessage(message: string) {
-    const input = this.page.locator('textarea[aria-label="消息输入框"]')
-    const sendButton = this.page.locator('button[aria-label="发送消息"]')
-
-    await input.fill(message)
-    await sendButton.click()
-
-    // 等待消息发送
-    await this.page.waitForSelector(`[data-message-role="user"]:has-text("${message.slice(0, 20)}")`, {
-      timeout: 5000
-    })
-  }
-
-  /**
-   * 等待AI响应
-   */
-  async waitForResponse() {
-    return this.page.waitForSelector('[data-message-role="assistant"]', {
-      timeout: 30000
-    })
-  }
-
-  /**
-   * 获取最后一条消息
-   */
-  async getLastMessage(role: 'user' | 'assistant') {
-    const message = this.page.locator(`[data-message-role="${role}"]`).last()
-    return await message.textContent()
-  }
-
-  /**
-   * 等待加载完成
+   * Wait for page load
    */
   async waitForLoad() {
     await this.page.waitForLoadState('networkidle')
   }
 
   /**
-   * 截图（用于调试）
+   * Take screenshot for debugging
    */
   async screenshot(name: string) {
     await this.page.screenshot({
@@ -103,28 +59,35 @@ export class TestHelpers {
       fullPage: true
     })
   }
+
+  /**
+   * Get current URL
+   */
+  getUrl() {
+    return this.page.url()
+  }
 }
 
 /**
- * 测试数据生成器
+ * Test data generator
  */
 export class TestDataGenerator {
   /**
-   * 生成随机用户邮箱
+   * Generate random email
    */
   static randomEmail() {
     return `test-${Date.now()}@example.com`
   }
 
   /**
-   * 生成随机用户名
+   * Generate random username
    */
   static randomUsername() {
     return `user_${Date.now()}`
   }
 
   /**
-   * 生成随机消息内容
+   * Generate random message
    */
   static randomMessage() {
     const messages = [
@@ -138,14 +101,14 @@ export class TestDataGenerator {
   }
 
   /**
-   * 生成长文本
+   * Generate long text
    */
   static longText(length: number) {
     return 'A'.repeat(length)
   }
 
   /**
-   * 生成包含特殊字符的文本
+   * Generate text with special characters
    */
   static specialCharsText() {
     return 'Test: < > & " \' \n \t @ # $ % ^ * ( ) _ + - = { } [ ] | \\ : ; " \' < > , . ? /'
@@ -153,47 +116,13 @@ export class TestDataGenerator {
 }
 
 /**
- * 断言辅助函数
- */
-export class Assertions {
-  constructor(private page: Page) {}
-
-  /**
-   * 验证元素可见
-   */
-  async isVisible(selector: string) {
-    const element = this.page.locator(selector)
-    return await element.isVisible()
-  }
-
-  /**
-   * 验证元素包含文本
-   */
-  async containsText(selector: string, text: string) {
-    const element = this.page.locator(selector)
-    return await element.textContent().then(content => content?.includes(text))
-  }
-
-  /**
-   * 验证URL匹配
-   */
-  async urlMatches(pattern: RegExp | string) {
-    const url = this.page.url()
-    if (pattern instanceof RegExp) {
-      return pattern.test(url)
-    }
-    return url.includes(pattern)
-  }
-}
-
-/**
- * 性能监控
+ * Performance monitoring utility
  */
 export class PerformanceMonitor {
   private metrics: Map<string, number[]> = new Map()
 
   /**
-   * 记录性能指标
+   * Record performance metric
    */
   recordMetric(name: string, value: number) {
     if (!this.metrics.has(name)) {
@@ -203,7 +132,7 @@ export class PerformanceMonitor {
   }
 
   /**
-   * 获取平均指标
+   * Get average metric value
    */
   getAverageMetric(name: string) {
     const values = this.metrics.get(name)
@@ -214,7 +143,7 @@ export class PerformanceMonitor {
   }
 
   /**
-   * 验证性能阈值
+   * Verify threshold
    */
   verifyThreshold(name: string, threshold: number) {
     const avg = this.getAverageMetric(name)
