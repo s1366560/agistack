@@ -1,20 +1,20 @@
-# OpenCode Web 应用开发计划与架构设计
+# OpenCode Web 应用开发计划与架构设计（本地部署版）
 
-> 基于 vendor/opencode 代码库分析，从零开始构建 Web 应用版本的完整计划
+> 基于 vendor/opencode 代码库分析，从零开始构建可本地部署的 Web 应用版本
 
 ---
 
 ## 目录
 
 1. [项目概述](#项目概述)
-2. [技术栈选型](#技术栈选型)
-3. [架构设计](#架构设计)
+2. [技术栈选型（本地部署版）](#技术栈选型本地部署版)
+3. [架构设计（本地部署）](#架构设计本地部署)
 4. [数据模型设计](#数据模型设计)
 5. [API 设计](#api-设计)
 6. [前端架构](#前端架构)
-7. [开发路线图](#开发路线图)
-8. [关键实现细节](#关键实现细节)
-9. [部署策略](#部署策略)
+7. [本地部署方案](#本地部署方案)
+8. [开发路线图](#开发路线图)
+9. [关键实现细节](#关键实现细节)
 10. [测试策略](#测试策略)
 
 ---
@@ -23,7 +23,7 @@
 
 ### 1.1 目标
 
-构建一个基于 Web 的 AI 编程助手应用，提供类似 OpenCode 的核心功能：
+构建一个**完全可本地部署**的基于 Web 的 AI 编程助手应用，提供类似 OpenCode 的核心功能：
 
 - **多 AI 提供商支持**：Anthropic、OpenAI、Google、Groq 等
 - **多 Agent 系统**：构建、规划、通用 Agent
@@ -34,22 +34,31 @@
 - **终端集成**：命令执行
 - **实时同步**：WebSocket 支持
 
-### 1.2 核心特性
+### 1.2 本地部署特性
+
+✅ **无云依赖**：所有组件可在本地运行
+✅ **自包含**：单一可执行文件或 Docker 镜像
+✅ **数据隐私**：所有数据存储在本地
+✅ **离线可用**：支持离线模式（本地 LLM）
+✅ **易于部署**：一行命令启动
+
+### 1.3 核心特性
 
 | 特性 | 描述 | 优先级 |
 |------|------|--------|
 | 多模型支持 | 支持多家 AI 提供商 | P0 |
 | 文件操作 | 读取、编辑、搜索代码 | P0 |
 | 会话管理 | 多会话、历史记录 | P0 |
+| 本地存储 | SQLite/PostgreSQL 本地数据库 | P0 |
+| WebSocket 通信 | 实时消息推送 | P0 |
 | 权限系统 | 细粒度访问控制 | P1 |
 | LSP 集成 | 代码智能 | P1 |
-| MCP 支持 | 插件系统 | P2 |
 | 终端集成 | 命令执行 | P2 |
-| 实时同步 | WebSocket | P1 |
+| MCP 支持 | 插件系统 | P2 |
 
 ---
 
-## 2. 技术栈选型
+## 2. 技术栈选型（本地部署版）
 
 ### 2.1 前端技术栈
 
@@ -76,49 +85,90 @@
 - **@solidjs/router** - 文件路由
 - **@solidjs/start** - SSR 框架
 
-### 2.2 后端技术栈
+### 2.2 后端技术栈（本地部署）
 
 #### 运行时
 - **Bun 1.3+** - JavaScript 运行时
   - 原因：极速、原生 TypeScript、内置包管理器
-  - OpenCode 生产验证
+  - 可打包为单一可执行文件
 
 #### Web 框架
 - **Hono 4+** - 轻量级 Web 框架
-  - 原因：Cloudflare Workers 原生支持
+  - 支持 Bun 原生运行
   - 类似 Express API，易于上手
+  - 内置 WebSocket 支持
+
+#### HTTP 服务器
+- **Bun.serve** - 内置 HTTP 服务器
+  - 无需 Nginx/Apache
+  - 极高性能
+  - 自动 HTTPS（可选）
 
 #### AI 集成
 - **Vercel AI SDK 5+** - LLM 抽象层
   - 支持多家提供商
   - 流式响应
   - 工具调用
+- **Ollama SDK** - 本地 LLM 支持
+  - 支持 Llama、Mistral 等本地模型
 
 #### 数据库
-- **PostgreSQL/MySQL** - 主数据库
+- **SQLite 3**（默认）- 轻量级本地数据库
+  - 零配置
+  - 单文件存储
+  - 适合个人/小团队
+- **PostgreSQL 15+**（可选）- 生产级数据库
+  - 适合大型部署
+  - 更强大的并发能力
+  - 可使用 Docker 部署
+
+#### ORM
 - **Drizzle ORM** - 类型安全 ORM
-- **Redis** - 缓存和会话
+  - 支持 SQLite 和 PostgreSQL
+  - 零迁移文件
+  - 优秀的 TypeScript 支持
 
-### 2.3 基础设施
+#### 缓存
+- **Redis 7+**（可选）- 内存缓存
+  - 用于会话存储
+  - 用于限流计数
+  - 可使用 Docker 部署
+- **内存缓存**（默认）- 简单场景
 
-#### 部署平台
-- **Cloudflare Workers** - 无服务器计算
-- **Cloudflare Pages** - 静态托管
-- **Cloudflare R2** - 对象存储
+#### 文件存储
+- **本地文件系统** - 默认选项
+  - 项目文件直接访问
+  - 上传文件存储在本地
+  - 无需对象存储
 
-#### 基础设施即代码
-- **SST** - 部署框架
-- **Terraform** - 备选方案
+#### WebSocket
+- **Bun WebSocket** - 内置支持
+  - 实时消息推送
+  - 文件变更通知
+  - 终端输出流
 
-#### 开发工具
+#### 终端
+- **node-pty** - PTY 伪终端
+  - 完整终端模拟
+  - 支持 Shell 命令
+  - 跨平台支持
+
+### 2.3 开发工具
+
+#### 语言和工具
 - **TypeScript 5.8+** - 类型安全
 - **ESLint + Prettier** - 代码质量
+- **Bun Test** - 单元测试
 - **Playwright** - E2E 测试
-- **Vitest** - 单元测试
+
+#### 打包和分发
+- **Bun build** - 打包为单一可执行
+- **Docker** - 容器化部署
+- **Electron/Tauri**（可选）- 桌面应用
 
 ---
 
-## 3. 架构设计
+## 3. 架构设计（本地部署）
 
 ### 3.1 整体架构
 
@@ -126,23 +176,30 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                         客户端层                              │
 ├─────────────────────────────────────────────────────────────┤
-│  Web 前端 (SolidJS)          │  桌面应用 (Tauri)              │
-│  - 文件管理                  │  - 原生窗口                   │
-│  - 会话管理                  │  - 系统托盘                   │
-│  - 终端集成                  │  - 本地文件访问               │
-│  - 实时同步                  │  - 离线模式                   │
+│  Web 前端 (SolidJS + Vite)                                   │
+│  - 文件管理                  │  - 会话管理                    │
+│  - 实时同步                  │  - 设置管理                    │
+│  - 终端集成                  │  - 代码编辑                    │
 └──────────────┬──────────────────────────────────────────────┘
                │
-               │ WebSocket + HTTP
+               │ HTTP + WebSocket
                │
 ┌──────────────▼──────────────────────────────────────────────┐
-│                         API 网关层                           │
+│                    应用服务器 (Bun + Hono)                    │
 ├─────────────────────────────────────────────────────────────┤
-│  Hono API Server                                              │
-│  - 认证中间件                 │  - 限流中间件                │
-│  - 路由处理                   │  - 日志中间件                │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │              HTTP/WebSocket 服务器                    │    │
+│  │  - RESTful API 路由                                   │    │
+│  │  - WebSocket 连接管理                                │    │
+│  │  - 静态文件服务                                       │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│  ┌───────────┬───────────┬───────────┬─────────────────┐    │
+│  │ 中间件层   │           │           │                 │    │
+│  │ - 认证     │ - CORS    │ - 日志    │ - 错误处理      │    │
+│  │ - 限流     │ - 验证    │ - 压缩    │ - 安全头        │    │
+│  └───────────┴───────────┴───────────┴─────────────────┘    │
 └──────────────┬──────────────────────────────────────────────┘
-               │
                │
 ┌──────────────▼──────────────────────────────────────────────┐
 │                         服务层                               │
@@ -150,37 +207,142 @@
 │  Agent 服务      │  文件服务        │  会话服务                │
 │  - LLM 调用      │  - 读写操作      │  - 历史管理              │
 │  - 工具执行      │  - 搜索导航      │  - 上下文管理            │
-│  - 权限控制      │  - 版本控制      │  - 分享协作              │
+│  - 权限控制      │  - Git 操作      │  - 导入导出              │
 ├─────────────────┼─────────────────┼─────────────────────────┤
 │  LSP 服务        │  MCP 服务        │  终端服务                │
-│  - 代码分析      │  - 插件管理      │  - 命令执行              │
-│  - 智能提示      │  - 扩展加载      │  - PTY 管理              │
-│  - 诊断信息      │  - OAuth 处理    │  - 输出流                │
-└─────────────────┴─────────────────┴─────────────────────────┘
-               │
+│  - 代码分析      │  - 插件管理      │  - PTY 管理              │
+│  - 智能提示      │  - 扩展加载      │  - 命令执行              │
+│  - 诊断信息      │  - RPC 调用      │  - 输出流                │
+├─────────────────┴─────────────────┴─────────────────────────┤
+│  AI 提供商适配器                                               │
+│  - Anthropic  - OpenAI  - Google  - Groq  - Ollama           │
+└─────────────────────────────────────────────────────────────┘
                │
 ┌──────────────▼──────────────────────────────────────────────┐
 │                         数据层                               │
 ├─────────────────┬─────────────────┬─────────────────────────┤
-│  PostgreSQL      │  Redis          │  对象存储 (R2/S3)        │
-│  - 用户数据      │  - 会话缓存      │  - 文件快照              │
-│  - 项目配置      │  - 限流计数      │  - 代码片段              │
-│  - 会话历史      │  - 实时状态      │  - 附件文件              │
+│  SQLite/PG       │  文件系统        │  Redis (可选)           │
+│  - 用户数据      │  - 项目文件      │  - 会话缓存              │
+│  - 会话历史      │  - 上传文件      │  - 限流计数              │
+│  - 配置数据      │  - LSP 日志      │  - 实时状态              │
 └─────────────────┴─────────────────┴─────────────────────────┘
                │
-               │
 ┌──────────────▼──────────────────────────────────────────────┐
-│                       外部服务集成                            │
+│                       本地服务集成                            │
 ├─────────────────┬─────────────────┬─────────────────────────┤
-│  AI 提供商       │  Git 托管        │  CI/CD                  │
-│  - Anthropic    │  - GitHub        │  - GitHub Actions       │
-│  - OpenAI       │  - GitLab        │  - 自动测试              │
-│  - Google       │  - Bitbucket     │  - 自动部署              │
-│  - Groq         │  - Webhook       │                          │
+│  Git 托推        │  本地 LLM        │  LSP 服务器              │
+│  - 本地仓库      │  - Ollama       │  - TypeScript            │
+│  - 命令执行      │  - LM Studio    │  - Python                │
+│  - 状态查询      │  - LocalAI      │  - Go                    │
 └─────────────────┴─────────────────┴─────────────────────────┘
 ```
 
-### 3.2 前端架构
+### 3.2 单进程架构（推荐）
+
+**适用场景**：个人使用、小团队、快速部署
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              单一可执行文件 (opencode-server)             │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  ┌────────────────────────────────────────────────┐     │
+│  │         Bun HTTP/WebSocket Server              │     │
+│  │         监听端口: 3000 (HTTP)                   │     │
+│  │                 3001 (WebSocket)               │     │
+│  └────────────────────────────────────────────────┘     │
+│                       │                                  │
+│  ┌────────────────────────────────────────────────┐     │
+│  │         API 路由 (Hono)                         │     │
+│  │  - /api/projects                               │     │
+│  │  - /api/sessions                               │     │
+│  │  - /api/files                                  │     │
+│  │  - /ws (WebSocket)                             │     │
+│  └────────────────────────────────────────────────┘     │
+│                       │                                  │
+│  ┌────────────────────────────────────────────────┐     │
+│  │         业务逻辑层                              │     │
+│  │  - AgentService                                │     │
+│  │  - FileService                                 │     │
+│  │  - SessionService                              │     │
+│  │  - LSPService                                  │     │
+│  │  - TerminalService                             │     │
+│  └────────────────────────────────────────────────┘     │
+│                       │                                  │
+│  ┌────────────────────────────────────────────────┐     │
+│  │         数据访问层                              │     │
+│  │  - SQLite (./data/opencode.db)                 │     │
+│  │  - 文件系统 (./projects/)                      │     │
+│  │  - 内存缓存                                     │     │
+│  └────────────────────────────────────────────────┘     │
+│                                                          │
+└─────────────────────────────────────────────────────────┘
+
+启动命令：
+  $ opencode-server start
+
+访问地址：
+  http://localhost:3000
+```
+
+### 3.3 Docker Compose 架构（可选）
+
+**适用场景**：团队协作、生产部署、需要更多功能
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # 应用服务器
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    volumes:
+      - ./data:/app/data
+      - ./projects:/app/projects
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DATABASE_URL=postgresql://opencode:password@db:5432/opencode
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - db
+      - redis
+
+  # PostgreSQL 数据库
+  db:
+    image: postgres:15-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=opencode
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=opencode
+    ports:
+      - "5432:5432"
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  # Ollama 本地 LLM（可选）
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+
+volumes:
+  postgres_data:
+  ollama_data:
+```
+
+### 3.4 前端架构
 
 ```
 src/
@@ -255,11 +417,11 @@ src/
     └── config.ts
 ```
 
-### 3.3 后端架构
+### 3.5 后端架构
 
 ```
 src/
-├── server.ts                # Hono 服务器入口
+├── server.ts                # 服务器入口
 ├── routes/                  # API 路由
 │   ├── agents.ts           # Agent 端点
 │   ├── sessions.ts         # 会话端点
@@ -267,7 +429,7 @@ src/
 │   ├── projects.ts         # 项目端点
 │   ├── models.ts           # 模型端点
 │   ├── providers.ts        # 提供商端点
-│   └── webhooks.ts         # Webhook 处理
+│   └── index.ts            # 路由聚合
 ├── services/                # 业务服务
 │   ├── AgentService.ts     # Agent 逻辑
 │   ├── SessionService.ts   # 会话管理
@@ -290,6 +452,8 @@ src/
 │   ├── anthropic.ts
 │   ├── openai.ts
 │   ├── google.ts
+│   ├── groq.ts
+│   ├── ollama.ts           # 本地 LLM
 │   └── index.ts
 ├── middleware/              # 中间件
 │   ├── auth.ts             # 认证
@@ -300,283 +464,275 @@ src/
 │   ├── schema.ts           # Drizzle schema
 │   ├── migrations/         # 迁移文件
 │   └── seed.ts             # 种子数据
+├── websocket/               # WebSocket
+│   ├── handler.ts          # WS 处理器
+│   ├── events.ts           # 事件定义
+│   └── broadcast.ts        # 广播逻辑
 └── lib/                     # 工具库
     ├── ai.ts               # AI SDK 集成
     ├── crypto.ts           # 加密工具
     └── logger.ts           # 日志工具
 ```
 
-### 3.4 微服务架构（可选扩展）
-
-随着应用规模增长，可以考虑拆分为微服务：
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                     API Gateway                          │
-│              (Kong / AWS API Gateway)                    │
-└────────────────┬────────────────────────────────────────┘
-                 │
-      ┌──────────┼──────────┬──────────┬──────────┐
-      │          │          │          │          │
-┌─────▼─────┐ ┌─▼──────┐ ┌─▼──────┐ ┌─▼──────┐ ┌─▼──────┐
-│   Agent   │ │ Session│ │  File  │ │  LSP   │ │ Terminal│
-│  Service  │ │ Service│ │ Service│ │ Service│ │ Service │
-└─────┬─────┘ └─┬──────┘ └─┬──────┘ └─┬──────┘ └─┬──────┘
-      │         │          │          │          │
-      └─────────┼──────────┼──────────┼──────────┘
-                │          │          │
-      ┌─────────▼──────────▼──────────▼──────────┐
-      │         共享数据层 (PostgreSQL)           │
-      │         缓存层 (Redis)                    │
-      └──────────────────────────────────────────┘
-```
-
 ---
 
 ## 4. 数据模型设计
 
-### 4.1 核心表结构
+### 4.1 SQLite Schema（默认）
 
 ```sql
 -- 用户表
 CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email VARCHAR(255) UNIQUE NOT NULL,
-  name VARCHAR(255),
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  name TEXT,
   avatar_url TEXT,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-
--- 工作区表
-CREATE TABLE workspaces (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id),
-  name VARCHAR(255) NOT NULL,
-  settings JSONB DEFAULT '{}',
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  settings TEXT DEFAULT '{}', -- JSON
+  created_at INTEGER DEFAULT (strftime('%s', 'now')),
+  updated_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
 
 -- 项目表
 CREATE TABLE projects (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id UUID REFERENCES workspaces(id),
-  name VARCHAR(255) NOT NULL,
+  id TEXT PRIMARY KEY,
+  user_id TEXT REFERENCES users(id),
+  name TEXT NOT NULL,
   path TEXT NOT NULL,
   description TEXT,
-  metadata JSONB DEFAULT '{}',
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  metadata TEXT DEFAULT '{}', -- JSON
+  created_at INTEGER DEFAULT (strftime('%s', 'now')),
+  updated_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
 
 -- 会话表
 CREATE TABLE sessions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id UUID REFERENCES projects(id),
-  agent_type VARCHAR(50) NOT NULL, -- 'build', 'plan', 'general'
+  id TEXT PRIMARY KEY,
+  project_id TEXT REFERENCES projects(id),
+  agent_type TEXT NOT NULL, -- 'build', 'plan', 'general'
   title TEXT,
-  messages JSONB DEFAULT '[]',
-  context JSONB DEFAULT '{}',
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-
--- 消息表（可选，用于详细存储）
-CREATE TABLE messages (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id UUID REFERENCES sessions(id),
-  role VARCHAR(20) NOT NULL, -- 'user', 'assistant', 'system'
-  content TEXT NOT NULL,
-  metadata JSONB DEFAULT '{}',
-  created_at TIMESTAMP DEFAULT NOW()
+  messages TEXT DEFAULT '[]', -- JSON array
+  context TEXT DEFAULT '{}', -- JSON
+  created_at INTEGER DEFAULT (strftime('%s', 'now')),
+  updated_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
 
 -- 模型配置表
 CREATE TABLE models (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id UUID REFERENCES workspaces(id),
-  provider VARCHAR(100) NOT NULL,
-  model_name VARCHAR(255) NOT NULL,
+  id TEXT PRIMARY KEY,
+  user_id TEXT REFERENCES users(id),
+  provider TEXT NOT NULL,
+  model_name TEXT NOT NULL,
   api_endpoint TEXT,
-  config JSONB DEFAULT '{}',
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  config TEXT DEFAULT '{}', -- JSON
+  created_at INTEGER DEFAULT (strftime('%s', 'now')),
+  updated_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
 
 -- API 密钥表（加密存储）
 CREATE TABLE api_keys (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id UUID REFERENCES workspaces(id),
-  provider VARCHAR(100) NOT NULL,
-  key_hash VARCHAR(255) NOT NULL,
+  id TEXT PRIMARY KEY,
+  user_id TEXT REFERENCES users(id),
+  provider TEXT NOT NULL,
+  key_hash TEXT NOT NULL,
   encrypted_key TEXT NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  created_at INTEGER DEFAULT (strftime('%s', 'now')),
+  updated_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
 
 -- 权限规则表
 CREATE TABLE permissions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id UUID REFERENCES workspaces(id),
-  agent_type VARCHAR(50),
-  resource_type VARCHAR(100), -- 'file', 'directory', 'command'
+  id TEXT PRIMARY KEY,
+  user_id TEXT REFERENCES users(id),
+  agent_type TEXT,
+  resource_type TEXT NOT NULL, -- 'file', 'directory', 'command'
   pattern TEXT NOT NULL,
-  action VARCHAR(20) NOT NULL, -- 'allow', 'deny', 'ask'
-  created_at TIMESTAMP DEFAULT NOW()
+  action TEXT NOT NULL, -- 'allow', 'deny', 'ask'
+  created_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
 
 -- LSP 服务器配置表
 CREATE TABLE lsp_servers (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id UUID REFERENCES workspaces(id),
-  language VARCHAR(100) NOT NULL,
+  id TEXT PRIMARY KEY,
+  user_id TEXT REFERENCES users(id),
+  language TEXT NOT NULL,
   command TEXT NOT NULL,
-  args JSONB DEFAULT '[]',
-  config JSONB DEFAULT '{}',
-  created_at TIMESTAMP DEFAULT NOW()
+  args TEXT DEFAULT '[]', -- JSON array
+  config TEXT DEFAULT '{}', -- JSON
+  created_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
 
 -- MCP 插件表
 CREATE TABLE mcp_plugins (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id UUID REFERENCES workspaces(id),
-  name VARCHAR(255) NOT NULL,
-  enabled BOOLEAN DEFAULT TRUE,
-  config JSONB DEFAULT '{}',
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-
--- 文件快照表（用于版本对比）
-CREATE TABLE file_snapshots (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id UUID REFERENCES projects(id),
-  file_path TEXT NOT NULL,
-  content TEXT,
-  metadata JSONB DEFAULT '{}',
-  created_at TIMESTAMP DEFAULT NOW()
+  id TEXT PRIMARY KEY,
+  user_id TEXT REFERENCES users(id),
+  name TEXT NOT NULL,
+  enabled INTEGER DEFAULT 1,
+  config TEXT DEFAULT '{}', -- JSON
+  created_at INTEGER DEFAULT (strftime('%s', 'now')),
+  updated_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
 
 -- 索引
 CREATE INDEX idx_sessions_project ON sessions(project_id);
-CREATE INDEX idx_messages_session ON messages(session_id);
-CREATE INDEX idx_projects_workspace ON projects(workspace_id);
-CREATE INDEX idx_permissions_workspace ON permissions(workspace_id);
+CREATE INDEX idx_projects_user ON projects(user_id);
+CREATE INDEX idx_permissions_user ON permissions(user_id);
+CREATE INDEX idx_models_user ON models(user_id);
 ```
 
-### 4.2 TypeScript 类型定义
+### 4.2 Drizzle Schema 定义
 
 ```typescript
-// types/index.ts
+// src/db/schema.ts
 
-export interface User {
-  id: string;
-  email: string;
-  name?: string;
-  avatarUrl?: string;
-  createdAt: Date;
-  updatedAt: Date;
+import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+
+export const users = sqliteTable('users', {
+  id: text('id').primaryKey(),
+  email: text('email').notNull().unique(),
+  name: text('name'),
+  avatarUrl: text('avatar_url'),
+  settings: text('settings').default('{}'),
+  createdAt: integer('created_at').default(sql`strftime('%s', 'now')`),
+  updatedAt: integer('updated_at').default(sql`strftime('%s', 'now')`),
+});
+
+export const projects = sqliteTable('projects', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id),
+  name: text('name').notNull(),
+  path: text('path').notNull(),
+  description: text('description'),
+  metadata: text('metadata').default('{}'),
+  createdAt: integer('created_at').default(sql`strftime('%s', 'now')`),
+  updatedAt: integer('updated_at').default(sql`strftime('%s', 'now')`),
+});
+
+export const sessions = sqliteTable('sessions', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').references(() => projects.id),
+  agentType: text('agent_type').notNull(),
+  title: text('title'),
+  messages: text('messages').default('[]'),
+  context: text('context').default('{}'),
+  createdAt: integer('created_at').default(sql`strftime('%s', 'now')`),
+  updatedAt: integer('updated_at').default(sql`strftime('%s', 'now')`),
+});
+
+export const models = sqliteTable('models', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id),
+  provider: text('provider').notNull(),
+  modelName: text('model_name').notNull(),
+  apiEndpoint: text('api_endpoint'),
+  config: text('config').default('{}'),
+  createdAt: integer('created_at').default(sql`strftime('%s', 'now')`),
+  updatedAt: integer('updated_at').default(sql`strftime('%s', 'now')`),
+});
+
+export const apiKeys = sqliteTable('api_keys', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id),
+  provider: text('provider').notNull(),
+  keyHash: text('key_hash').notNull(),
+  encryptedKey: text('encrypted_key').notNull(),
+  createdAt: integer('created_at').default(sql`strftime('%s', 'now')`),
+  updatedAt: integer('updated_at').default(sql`strftime('%s', 'now')`),
+});
+
+export const permissions = sqliteTable('permissions', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id),
+  agentType: text('agent_type'),
+  resourceType: text('resource_type').notNull(),
+  pattern: text('pattern').notNull(),
+  action: text('action').notNull(),
+  createdAt: integer('created_at').default(sql`strftime('%s', 'now')`),
+});
+
+export const lspServers = sqliteTable('lsp_servers', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id),
+  language: text('language').notNull(),
+  command: text('command').notNull(),
+  args: text('args').default('[]'),
+  config: text('config').default('{}'),
+  createdAt: integer('created_at').default(sql`strftime('%s', 'now')`),
+});
+
+export const mcpPlugins = sqliteTable('mcp_plugins', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id),
+  name: text('name').notNull(),
+  enabled: integer('enabled', { mode: 'boolean' }).default(true),
+  config: text('config').default('{}'),
+  createdAt: integer('created_at').default(sql`strftime('%s', 'now')`),
+  updatedAt: integer('updated_at').default(sql`strftime('%s', 'now')`),
+});
+```
+
+### 4.3 数据库初始化
+
+```typescript
+// src/db/index.ts
+
+import Database from 'bun:sqlite';
+import { drizzle } from 'drizzle-orm/bun-sqlite';
+import * as schema from './schema';
+
+let db: ReturnType<typeof drizzle>;
+
+export function initDatabase(path: string = './data/opencode.db') {
+  // 确保数据目录存在
+  import { mkdirSync } from 'fs';
+  mkdirSync('./data', { recursive: true });
+
+  // 创建 SQLite 连接
+  const sqlite = new Database(path);
+  db = drizzle(sqlite, { schema });
+
+  // 运行迁移
+  migrate();
+
+  return db;
 }
 
-export interface Workspace {
-  id: string;
-  userId: string;
-  name: string;
-  settings: Record<string, any>;
-  createdAt: Date;
-  updatedAt: Date;
+export function getDatabase() {
+  if (!db) {
+    throw new Error('Database not initialized. Call initDatabase() first.');
+  }
+  return db;
 }
 
-export interface Project {
-  id: string;
-  workspaceId: string;
-  name: string;
-  path: string;
-  description?: string;
-  metadata: Record<string, any>;
-  createdAt: Date;
-  updatedAt: Date;
-}
+async function migrate() {
+  // 创建表
+  const sqlite = new Database('./data/opencode.db');
 
-export interface Session {
-  id: string;
-  projectId: string;
-  agentType: 'build' | 'plan' | 'general';
-  title?: string;
-  messages: Message[];
-  context: Record<string, any>;
-  createdAt: Date;
-  updatedAt: Date;
-}
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      name TEXT,
+      avatar_url TEXT,
+      settings TEXT DEFAULT '{}',
+      created_at INTEGER DEFAULT (strftime('%s', 'now')),
+      updated_at INTEGER DEFAULT (strftime('%s', 'now'))
+    );
 
-export interface Message {
-  id?: string;
-  sessionId?: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  metadata?: Record<string, any>;
-  createdAt?: Date;
-}
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY,
+      user_id TEXT REFERENCES users(id),
+      name TEXT NOT NULL,
+      path TEXT NOT NULL,
+      description TEXT,
+      metadata TEXT DEFAULT '{}',
+      created_at INTEGER DEFAULT (strftime('%s', 'now')),
+      updated_at INTEGER DEFAULT (strftime('%s', 'now'))
+    );
 
-export interface Model {
-  id: string;
-  workspaceId: string;
-  provider: string;
-  modelName: string;
-  apiEndpoint?: string;
-  config: Record<string, any>;
-  createdAt: Date;
-  updatedAt: Date;
-}
+    -- ... 其他表
+  `);
 
-export interface APIKey {
-  id: string;
-  workspaceId: string;
-  provider: string;
-  keyHash: string;
-  encryptedKey: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface Permission {
-  id: string;
-  workspaceId: string;
-  agentType?: string;
-  resourceType: string;
-  pattern: string;
-  action: 'allow' | 'deny' | 'ask';
-  createdAt: Date;
-}
-
-export interface LSPServer {
-  id: string;
-  workspaceId: string;
-  language: string;
-  command: string;
-  args: string[];
-  config: Record<string, any>;
-  createdAt: Date;
-}
-
-export interface MCPPlugin {
-  id: string;
-  workspaceId: string;
-  name: string;
-  enabled: boolean;
-  config: Record<string, any>;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface FileSnapshot {
-  id: string;
-  projectId: string;
-  filePath: string;
-  content?: string;
-  metadata: Record<string, any>;
-  createdAt: Date;
+  sqlite.close();
 }
 ```
 
@@ -593,6 +749,7 @@ POST   /api/projects                    # 创建新项目
 GET    /api/projects/:id                # 获取项目详情
 PUT    /api/projects/:id                # 更新项目
 DELETE /api/projects/:id                # 删除项目
+POST   /api/projects/:id/open           # 在编辑器中打开
 ```
 
 #### 会话管理
@@ -602,8 +759,9 @@ POST   /api/projects/:id/sessions       # 创建新会话
 GET    /api/sessions/:id                # 获取会话详情
 PUT    /api/sessions/:id                # 更新会话
 DELETE /api/sessions/:id                # 删除会话
-POST   /api/sessions/:id/messages       # 发送消息
+POST   /api/sessions/:id/messages       # 发送消息（流式）
 GET    /api/sessions/:id/messages       # 获取消息历史
+POST   /api/sessions/:id/export         # 导出会话
 ```
 
 #### Agent 操作
@@ -618,8 +776,9 @@ POST   /api/agents/:type/switch         # 切换 Agent
 GET    /api/projects/:id/files          # 列出文件
 POST   /api/projects/:id/files/read     # 读取文件
 POST   /api/projects/:id/files/write    # 写入文件
-POST   /api/projects/:id/files/search   # 搜索文件
-POST   /api/projects/:id/files/edit     # 编辑文件
+POST   /api/projects/:id/files/search   # 搜索文件内容
+POST   /api/projects/:id/files/edit     # 编辑文件（diff 应用）
+GET    /api/projects/:id/files/tree     # 获取文件树
 ```
 
 #### 模型和提供商
@@ -629,6 +788,7 @@ POST   /api/models                      # 添加模型
 PUT    /api/models/:id                  # 更新模型
 DELETE /api/models/:id                  # 删除模型
 GET    /api/providers                   # 获取可用提供商
+POST   /api/providers/test              # 测试提供商连接
 ```
 
 #### LSP 和 MCP
@@ -649,30 +809,47 @@ GET    /api/terminal/:id/output         # 获取输出
 DELETE /api/terminal/:id                # 关闭终端
 ```
 
+#### 系统设置
+```
+GET    /api/settings                    # 获取设置
+PUT    /api/settings                    # 更新设置
+GET    /api/status                      # 系统状态
+```
+
 ### 5.2 WebSocket API
 
 ```typescript
 // WebSocket 消息协议
 
 type WSMessage =
-  | { type: 'hello'; sessionId: string }
+  | { type: 'hello'; token: string }
+  | { type: 'sub'; channel: string; sessionId?: string }
+  | { type: 'unsub'; channel: string }
   | { type: 'message'; data: Message }
-  | { type: 'agent_start'; agentType: string }
-  | { type: 'agent_progress'; progress: number }
-  | { type: 'agent_complete'; result: any }
-  | { type: 'file_change'; filePath: string; content: string }
-  | { type: 'terminal_output'; output: string }
+  | { type: 'agent_start'; agentType: string; sessionId: string }
+  | { type: 'agent_progress'; progress: number; sessionId: string }
+  | { type: 'agent_complete'; result: any; sessionId: string }
+  | { type: 'file_change'; projectId: string; filePath: string; content?: string }
+  | { type: 'terminal_output'; sessionId: string; output: string }
   | { type: 'error'; error: string }
   | { type: 'ping' }
   | { type: 'pong' };
 
 // 客户端使用示例
-const ws = new WebSocket('wss://api.example.com/sync');
+const ws = new WebSocket('ws://localhost:3001/ws');
 
 ws.onopen = () => {
+  // 认证
   ws.send(JSON.stringify({
     type: 'hello',
-    sessionId: 'session-123'
+    token: localStorage.getItem('authToken')
+  }));
+
+  // 订阅会话消息
+  ws.send(JSON.stringify({
+    type: 'sub',
+    channel: 'session:abc-123',
+    sessionId: 'abc-123'
   }));
 };
 
@@ -682,714 +859,354 @@ ws.onmessage = (event) => {
   switch (message.type) {
     case 'message':
       // 处理新消息
+      updateMessages(message.data);
       break;
     case 'agent_progress':
       // 更新进度条
+      updateProgress(message.progress);
       break;
     case 'file_change':
       // 刷新文件内容
+      refreshFile(message.filePath, message.content);
       break;
-    // ...
+    case 'terminal_output':
+      // 更新终端输出
+      appendTerminalOutput(message.output);
+      break;
+    case 'error':
+      // 显示错误
+      showError(message.error);
+      break;
   }
 };
 ```
 
-### 5.3 API 请求/响应示例
+### 5.3 服务器实现示例
 
-#### 创建项目
 ```typescript
-// POST /api/projects
-{
-  "name": "my-awesome-project",
-  "path": "/Users/user/projects/my-awesome-project",
-  "description": "An awesome web application"
-}
+// src/server.ts
 
-// 201 Created
-{
-  "id": "proj-123",
-  "name": "my-awesome-project",
-  "path": "/Users/user/projects/my-awesome-project",
-  "description": "An awesome web application",
-  "metadata": {},
-  "createdAt": "2026-01-24T12:00:00Z",
-  "updatedAt": "2026-01-24T12:00:00Z"
-}
-```
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { logger } from 'hono/logger';
+import { serve } from 'bun';
+import { apiRoutes } from './routes';
+import { createWebSocketServer } from './websocket';
 
-#### 发送消息
-```typescript
-// POST /api/sessions/sess-123/messages
-{
-  "content": "帮我创建一个 React 组件",
-  "attachments": [
-    {
-      "type": "file",
-      "path": "/path/to/file.ts"
-    }
-  ]
-}
+const app = new Hono();
 
-// 200 OK (流式响应)
-{
-  "id": "msg-456",
-  "sessionId": "sess-123",
-  "role": "assistant",
-  "content": "好的，我来帮你创建...",
-  "metadata": {
-    "model": "claude-sonnet-4-5",
-    "tokensUsed": 1234
+// 中间件
+app.use('*', logger());
+app.use('*', cors({
+  origin: ['http://localhost:3000', 'http://localhost:5173'],
+  credentials: true,
+}));
+
+// API 路由
+app.route('/api', apiRoutes);
+
+// 静态文件服务（生产环境）
+app.use('*', async (c) => {
+  // 返回 index.html
+  return c.html(Bun.file('./dist/index.html'));
+});
+
+// 启动服务器
+const port = parseInt(process.env.PORT || '3000');
+
+const server = serve({
+  port,
+  fetch: app.fetch,
+  websocket: {
+    message: (ws, message) => {
+      // WebSocket 消息处理
+      createWebSocketServer().handleMessage(ws, message);
+    },
+    open: (ws) => {
+      createWebSocketServer().handleOpen(ws);
+    },
+    close: (ws) => {
+      createWebSocketServer().handleClose(ws);
+    },
   },
-  "createdAt": "2026-01-24T12:01:00Z"
-}
-```
+});
 
-#### 搜索文件
-```typescript
-// POST /api/projects/proj-123/files/search
-{
-  "query": "function fetchData",
-  "filePattern": "**/*.ts",
-  "options": {
-    "caseSensitive": false,
-    "regex": false
-  }
-}
-
-// 200 OK
-{
-  "results": [
-    {
-      "filePath": "/src/services/api.ts",
-      "lineNumber": 42,
-      "content": "export async function fetchData() {",
-      "matches": [
-        {
-          "start": 14,
-          "end": 26,
-          "text": "function fetchData"
-        }
-      ]
-    }
-  ],
-  "total": 1
-}
+console.log(`🚀 Server running on http://localhost:${port}`);
+console.log(`📡 WebSocket on ws://localhost:${port}/ws`);
 ```
 
 ---
 
 ## 6. 前端架构
 
-### 6.1 核心页面设计
+（与云版本相同，参见前文第 6 节）
 
-#### 1. 工作台 (Dashboard)
-**路由**: `/` 或 `/projects`
+---
 
-**布局**:
-```
-┌─────────────────────────────────────────────────┐
-│ Logo         搜索框         用户头像              │
-├──────────────┬──────────────────────────────────┤
-│              │                                  │
-│ 项目列表      │     欢迎！开始新项目              │
-│              │                                  │
-│ 📁 项目 A     │  [创建新项目]                    │
-│ 📁 项目 B     │                                  │
-│ 📁 项目 C     │  或打开最近项目：                  │
-│              │     📁 上次编辑的项目              │
-│ [+ 新建项目]  │                                  │
-│              │                                  │
-└──────────────┴──────────────────────────────────┘
-```
+## 7. 本地部署方案
 
-#### 2. 项目详情页
-**路由**: `/projects/:id`
+### 7.1 单一可执行文件部署
 
-**布局**:
-```
-┌─────────────────────────────────────────────────────────────┐
-│ [< 返回]  项目名称                    [设置] [分享]           │
-├──────────────┬──────────────────────────────────────────────┤
-│              │                                              │
-│ 会话列表      │  当前会话内容                                 │
-│              │                                              │
-│ 📝 新建功能   │  用户: 帮我创建一个用户登录组件                 │
-│ 🐛 修复 Bug   │                                              │
-│ 💡 代码审查   │  Agent: 好的，我来创建...                    │
-│              │  [Thinking...]                                │
-│ [+ 新建会话]  │                                              │
-│              │  [文件: src/components/Login.tsx]             │
-│              │  [代码预览]                                   │
-│              │                                              │
-│              │  [继续对话]                                   │
-└──────────────┴──────────────────────────────────────────────┘
-```
-
-#### 3. 会话详情页
-**路由**: `/projects/:projectId/sessions/:sessionId`
-
-**功能**:
-- 消息历史展示
-- 流式响应渲染
-- 代码语法高亮
-- 文件变更查看
-- 上下文使用显示
-- Agent 切换
-
-### 6.2 关键组件设计
-
-#### PromptInput 组件
+#### 打包脚本
 ```typescript
-// components/chat/PromptInput.tsx
+// scripts/bundle.ts
 
-import { createSignal } from 'solid-js';
-import { IconButton } from '@/components/ui/IconButton';
-import { AttachmentButton } from '@/components/ui/AttachmentButton';
-import { SendButton } from '@/components/ui/SendButton';
+import { build } from 'bun';
 
-interface Props {
-  onSend: (content: string, attachments: File[]) => void;
-  disabled?: boolean;
-  placeholder?: string;
+async function bundle() {
+  // 打包后端
+  await build({
+    entrypoints: ['./src/server.ts'],
+    outdir: './dist',
+    target: 'bun',
+    format: 'esm',
+    splitting: false,
+    singleFile: true, // 单文件
+    bundling: true,
+  });
+
+  // 复制静态文件
+  await Bun.write('./dist/index.html', Bun.file('./frontend/dist/index.html'));
+
+  console.log('✅ Bundle created: ./dist/server.bundle.js');
 }
 
-export function PromptInput(props: Props) {
-  const [content, setContent] = createSignal('');
-  const [attachments, setAttachments] = createSignal<File[]>([]);
+bundle();
+```
 
-  const handleSend = () => {
-    if (!content().trim() && attachments().length === 0) return;
+#### 启动脚本
+```typescript
+// bin/opencode-server
 
-    props.onSend(content(), attachments());
-    setContent('');
-    setAttachments([]);
-  };
+#!/usr/bin/env bun
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
+const server = import('./dist/server.bundle.js');
+
+server.then((mod) => {
+  mod.default();
+});
+```
+
+#### 使用方式
+```bash
+# 构建
+$ bun run build
+
+# 启动服务器
+$ ./bin/opencode-server start
+
+# 指定端口
+$ PORT=8080 ./bin/opencode-server start
+
+# 指定数据目录
+$ DATA_DIR=/opt/opencode ./bin/opencode-server start
+```
+
+### 7.2 Docker 部署
+
+#### Dockerfile
+```dockerfile
+# Dockerfile
+
+FROM oven/bun:1.3-alpine
+
+WORKDIR /app
+
+# 安装依赖
+COPY package.json bun.lockb ./
+RUN bun install --production
+
+# 复制源代码
+COPY . .
+
+# 复制前端构建产物
+COPY --from=frontend /app/dist ./dist
+
+# 创建数据目录
+RUN mkdir -p /app/data /app/projects
+
+# 暴露端口
+EXPOSE 3000 3001
+
+# 环境变量
+ENV DATABASE_URL=/app/data/opencode.db
+ENV PORT=3000
+
+# 启动命令
+CMD ["bun", "run", "src/server.ts"]
+
+# 前端构建阶段
+FROM oven/bun:1.3-alpine AS frontend
+WORKDIR /app
+COPY package.json bun.lockb ./
+RUN bun install
+COPY frontend/src ./frontend/src
+COPY frontend/tsconfig.json ./frontend/
+RUN cd frontend && bun run build
+```
+
+#### docker-compose.yml
+```yaml
+version: '3.8'
+
+services:
+  opencode:
+    build: .
+    container_name: opencode-server
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    volumes:
+      - ./data:/app/data
+      - ./projects:/app/projects
+    environment:
+      - DATABASE_URL=/app/data/opencode.db
+      - PORT=3000
+      - NODE_ENV=production
+    restart: unless-stopped
+
+  # 可选：Ollama 本地 LLM
+  ollama:
+    image: ollama/ollama:latest
+    container_name: opencode-ollama
+    volumes:
+      - ./ollama:/root/.ollama
+    ports:
+      - "11434:11434"
+    restart: unless-stopped
+
+  # 可选：PostgreSQL（替代 SQLite）
+  postgres:
+    image: postgres:15-alpine
+    container_name: opencode-db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=opencode
+      - POSTGRES_PASSWORD=opencode
+      - POSTGRES_DB=opencode
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+```
+
+#### 使用方式
+```bash
+# 启动所有服务
+$ docker-compose up -d
+
+# 查看日志
+$ docker-compose logs -f
+
+# 停止服务
+$ docker-compose down
+
+# 重启服务
+$ docker-compose restart
+```
+
+### 7.3 系统服务配置（Systemd）
+
+#### opencode.service
+```ini
+# /etc/systemd/system/opencode.service
+
+[Unit]
+Description=OpenCode AI Server
+After=network.target
+
+[Service]
+Type=simple
+User=opencode
+WorkingDirectory=/opt/opencode
+ExecStart=/usr/bin/bun run /opt/opencode/src/server.ts
+Restart=on-failure
+RestartSec=10
+
+Environment="PORT=3000"
+Environment="DATA_DIR=/var/lib/opencode"
+Environment="DATABASE_URL=/var/lib/opencode/opencode.db"
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### 使用方式
+```bash
+# 安装服务
+$ sudo cp opencode.service /etc/systemd/system/
+$ sudo systemctl daemon-reload
+$ sudo systemctl enable opencode
+
+# 启动服务
+$ sudo systemctl start opencode
+
+# 查看状态
+$ sudo systemctl status opencode
+
+# 查看日志
+$ sudo journalctl -u opencode -f
+```
+
+### 7.4 Nginx 反向代理（可选）
+
+#### nginx.conf
+```nginx
+server {
+    listen 80;
+    server_name opencode.local;
+
+    # HTTP
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
-  };
 
-  return (
-    <div class="prompt-input-container">
-      <div class="attachments-preview">
-        <For each={attachments()}>
-          {(file) => (
-            <div class="attachment-item">
-              <span>{file.name}</span>
-              <button onClick={() => {
-                setAttachments(prev => prev.filter(f => f !== file));
-              }}>×</button>
-            </div>
-          )}
-        </For>
-      </div>
-
-      <textarea
-        value={content()}
-        onInput={(e) => setContent(e.currentTarget.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={props.placeholder || "输入你的问题..."}
-        disabled={props.disabled}
-        rows={content().split('\n').length}
-      />
-
-      <div class="prompt-actions">
-        <AttachmentButton
-          onAttach={(files) => setAttachments(prev => [...prev, ...files])}
-        />
-        <IconButton
-          icon="paperclip"
-          onClick={() => {/* 文件上传 */}}
-        />
-        <SendButton
-          onClick={handleSend}
-          disabled={props.disabled || (!content().trim() && attachments().length === 0)}
-        />
-      </div>
-    </div>
-  );
-}
-```
-
-#### FileTree 组件
-```typescript
-// components/editor/FileTree.tsx
-
-import { createSignal, For, Show } from 'solid-js';
-import { TreeNode } from '@/types/file';
-
-interface Props {
-  rootPath: string;
-  onSelect: (path: string) => void;
-  selectedPath?: string;
-}
-
-export function FileTree(props: Props) {
-  const [tree, setTree] = createSignal<TreeNode[]>([]);
-  const [expanded, setExpanded] = createSignal<Set<string>>(new Set());
-
-  // 加载文件树
-  const loadTree = async () => {
-    const response = await fetch(`/api/projects/${props.rootPath}/files`);
-    const data = await response.json();
-    setTree(data.files);
-  };
-
-  const toggleExpand = (path: string) => {
-    const prev = expanded();
-    const next = new Set(prev);
-    if (next.has(path)) {
-      next.delete(path);
-    } else {
-      next.add(path);
+    # WebSocket
+    location /ws {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
     }
-    setExpanded(next);
-  };
-
-  return (
-    <div class="file-tree">
-      <For each={tree()}>
-        {(node) => (
-          <TreeNode
-            node={node}
-            expanded={expanded()}
-            onToggle={toggleExpand}
-            onSelect={props.onSelect}
-            selectedPath={props.selectedPath}
-          />
-        )}
-      </For>
-    </div>
-  );
 }
-
-function TreeNode(props: {
-  node: TreeNode;
-  expanded: Set<string>;
-  onToggle: (path: string) => void;
-  onSelect: (path: string) => void;
-  selectedPath?: string;
-}) {
-  const isExpanded = () => props.expanded.has(props.node.path);
-  const isSelected = () => props.selectedPath === props.node.path;
-
-  return (
-    <div class="tree-node">
-      <div
-        class={`tree-node-content ${isSelected() ? 'selected' : ''}`}
-        onClick={() => {
-          if (props.node.type === 'directory') {
-            props.onToggle(props.node.path);
-          } else {
-            props.onSelect(props.node.path);
-          }
-        }}
-      >
-        <Show when={props.node.type === 'directory'}>
-          <span class="expand-icon">
-            {isExpanded() ? '▼' : '▶'}
-          </span>
-        </Show>
-        <span class="node-icon">
-          {props.node.type === 'directory' ? '📁' : '📄'}
-        </span>
-        <span class="node-name">{props.node.name}</span>
-      </div>
-
-      <Show when={props.node.type === 'directory' && isExpanded()}>
-        <div class="tree-node-children">
-          <For each={props.node.children}>
-            {(child) => (
-              <TreeNode
-                node={child}
-                expanded={props.expanded}
-                onToggle={props.onToggle}
-                onSelect={props.onSelect}
-                selectedPath={props.selectedPath}
-              />
-            )}
-          </For>
-        </div>
-      </Show>
-    </div>
-  );
-}
-```
-
-#### MessageList 组件
-```typescript
-// components/chat/MessageList.tsx
-
-import { For, Show, createEffect } from 'solid-js';
-import { Message } from '@/types/session';
-import { Markdown } from '@/components/ui/Markdown';
-import { CodeBlock } from '@/components/ui/CodeBlock';
-import { FileChange } from '@/components/ui/FileChange';
-
-interface Props {
-  messages: Message[];
-  streaming?: boolean;
-}
-
-export function MessageList(props: Props) {
-  let messagesEndRef: HTMLDivElement | undefined;
-
-  createEffect(() => {
-    // 自动滚动到底部
-    messagesEndRef?.scrollIntoView({ behavior: 'smooth' });
-  });
-
-  return (
-    <div class="message-list">
-      <For each={props.messages}>
-        {(message) => (
-          <div class={`message message-${message.role}`}>
-            <Show when={message.role === 'user'}>
-              <div class="message-avatar">👤</div>
-            </Show>
-            <Show when={message.role === 'assistant'}>
-              <div class="message-avatar">🤖</div>
-            </Show>
-
-            <div class="message-content">
-              <div class="message-meta">
-                <Show when={message.metadata?.model}>
-                  <span class="model-name">{message.metadata.model}</span>
-                </Show>
-                <Show when={message.createdAt}>
-                  <span class="timestamp">
-                    {new Date(message.createdAt).toLocaleTimeString()}
-                  </span>
-                </Show>
-              </div>
-
-              <Markdown content={message.content} />
-
-              <Show when={message.metadata?.fileChanges}>
-                <div class="file-changes">
-                  <For each={message.metadata.fileChanges}>
-                    {(change) => (
-                      <FileChange
-                        filePath={change.path}
-                        oldContent={change.oldContent}
-                        newContent={change.newContent}
-                      />
-                    )}
-                  </For>
-                </div>
-              </Show>
-
-              <Show when={message.metadata?.codeBlocks}>
-                <div class="code-blocks">
-                  <For each={message.metadata.codeBlocks}>
-                    {(block) => (
-                      <CodeBlock
-                        language={block.language}
-                        code={block.code}
-                        filename={block.filename}
-                      />
-                    )}
-                  </For>
-                </div>
-              </Show>
-            </div>
-          </div>
-        )}
-      </For>
-
-      <Show when={props.streaming}>
-        <div class="message message-assistant streaming">
-          <div class="message-avatar">🤖</div>
-          <div class="message-content">
-            <div class="typing-indicator">
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
-          </div>
-        </div>
-      </Show>
-
-      <div ref={messagesEndRef} />
-    </div>
-  );
-}
-```
-
-### 6.3 状态管理
-
-#### AppContext
-```typescript
-// contexts/AppContext.tsx
-
-import { createContext, useContext } from 'solid-js';
-import { createStore, produce } from 'solid-js/store';
-
-interface AppState {
-  user?: User;
-  workspace?: Workspace;
-  theme: 'light' | 'dark';
-  sidebarOpen: boolean;
-}
-
-const AppContext = createContext<{
-  state: AppState;
-  actions: {
-    setUser: (user: User) => void;
-    setWorkspace: (workspace: Workspace) => void;
-    toggleTheme: () => void;
-    toggleSidebar: () => void;
-  };
-}>();
-
-export function AppProvider(props: { children: any }) {
-  const [state, setState] = createStore<AppState>({
-    theme: 'dark',
-    sidebarOpen: true,
-  });
-
-  const actions = {
-    setUser: (user: User) => setState('user', user),
-    setWorkspace: (workspace: Workspace) => setState('workspace', workspace),
-    toggleTheme: () => setState('theme', state.theme === 'light' ? 'dark' : 'light'),
-    toggleSidebar: () => setState('sidebarOpen', !state.sidebarOpen),
-  };
-
-  return (
-    <AppContext.Provider value={{ state, actions }}>
-      {props.children}
-    </AppContext.Provider>
-  );
-}
-
-export function useApp() {
-  const context = useContext(AppContext);
-  if (!context) throw new Error('useApp must be used within AppProvider');
-  return context;
-}
-```
-
-#### SessionContext
-```typescript
-// contexts/SessionContext.tsx
-
-import { createContext, useContext } from 'solid-js';
-import { createStore } from 'solid-js/store';
-import { Session, Message } from '@/types/session';
-
-interface SessionState {
-  currentSession?: Session;
-  messages: Message[];
-  streaming: boolean;
-}
-
-const SessionContext = createContext<{
-  state: SessionState;
-  actions: {
-    loadSession: (sessionId: string) => Promise<void>;
-    sendMessage: (content: string, attachments?: File[]) => Promise<void>;
-    switchAgent: (agentType: 'build' | 'plan' | 'general') => void;
-    clearSession: () => void;
-  };
-}>();
-
-export function SessionProvider(props: { children: any }) {
-  const [state, setState] = createStore<SessionState>({
-    messages: [],
-    streaming: false,
-  });
-
-  const actions = {
-    loadSession: async (sessionId: string) => {
-      const response = await fetch(`/api/sessions/${sessionId}`);
-      const session: Session = await response.json();
-
-      setState({
-        currentSession: session,
-        messages: session.messages,
-      });
-    },
-
-    sendMessage: async (content: string, attachments: File[] = []) => {
-      if (!state.currentSession) return;
-
-      // 添加用户消息
-      const userMessage: Message = {
-        role: 'user',
-        content,
-        metadata: { attachments: attachments.map(f => f.name) },
-      };
-      setState('messages', prev => [...prev, userMessage]);
-      setState('streaming', true);
-
-      try {
-        const response = await fetch(`/api/sessions/${state.currentSession.id}/messages`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content, attachments }),
-        });
-
-        // 流式读取响应
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-        let assistantContent = '';
-
-        while (true) {
-          const { done, value } = await reader!.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n').filter(line => line.trim());
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = JSON.parse(line.slice(6));
-              if (data.content) {
-                assistantContent += data.content;
-                setState('messages', prev => {
-                  const last = prev[prev.length - 1];
-                  if (last && last.role === 'assistant' && prev.length > 0) {
-                    return [
-                      ...prev.slice(0, -1),
-                      { ...last, content: assistantContent }
-                    ];
-                  } else {
-                    return [
-                      ...prev,
-                      { role: 'assistant', content: assistantContent }
-                    ];
-                  }
-                });
-              }
-            }
-          }
-        }
-      } finally {
-        setState('streaming', false);
-      }
-    },
-
-    switchAgent: (agentType: 'build' | 'plan' | 'general') => {
-      // 切换 Agent 逻辑
-    },
-
-    clearSession: () => {
-      setState('messages', []);
-      setState('currentSession', undefined);
-    },
-  };
-
-  return (
-    <SessionContext.Provider value={{ state, actions }}>
-      {props.children}
-    </SessionContext.Provider>
-  );
-}
-
-export function useSession() {
-  const context = useContext(SessionContext);
-  if (!context) throw new Error('useSession must be used within SessionProvider');
-  return context;
-}
-```
-
-### 6.4 样式系统
-
-#### Tailwind 配置
-```javascript
-// tailwind.config.js
-
-export default {
-  content: ['./src/**/*.{js,jsx,ts,tsx}'],
-  darkMode: 'class',
-  theme: {
-    extend: {
-      colors: {
-        primary: {
-          50: '#f0f9ff',
-          100: '#e0f2fe',
-          200: '#bae6fd',
-          300: '#7dd3fc',
-          400: '#38bdf8',
-          500: '#0ea5e9',
-          600: '#0284c7',
-          700: '#0369a1',
-          800: '#075985',
-          900: '#0c4a6e',
-        },
-        dark: {
-          50: '#f9fafb',
-          100: '#f3f4f6',
-          200: '#e5e7eb',
-          300: '#d1d5db',
-          400: '#9ca3af',
-          500: '#6b7280',
-          600: '#4b5563',
-          700: '#374151',
-          800: '#1f2937',
-          900: '#111827',
-          950: '#030712',
-        },
-      },
-      fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
-      },
-      animation: {
-        'typing': 'typing 1.4s infinite',
-        'fade-in': 'fadeIn 0.2s ease-out',
-        'slide-up': 'slideUp 0.3s ease-out',
-      },
-      keyframes: {
-        typing: {
-          '0%, 60%, 100%': { transform: 'translateY(0)' },
-          '30%': { transform: 'translateY(-4px)' },
-        },
-        fadeIn: {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' },
-        },
-        slideUp: {
-          '0%': { transform: 'translateY(10px)', opacity: '0' },
-          '100%': { transform: 'translateY(0)', opacity: '1' },
-        },
-      },
-    },
-  },
-  plugins: [
-    require('@tailwindcss/typography'),
-    require('@tailwindcss/forms'),
-  ],
-};
 ```
 
 ---
 
-## 7. 开发路线图
+## 8. 开发路线图
 
 ### 阶段 1：基础架构搭建 (Week 1-2)
 
-**目标**: 建立项目基础，实现核心功能
+**目标**: 建立本地可运行的项目基础
 
 #### Week 1: 项目初始化
-- [ ] 创建 monorepo 结构
+- [ ] 创建项目结构
 - [ ] 配置 Bun + TypeScript
-- [ ] 设置 Turbo 构建
 - [ ] 配置 TailwindCSS
+- [ ] 配置 Vite（前端）
+- [ ] 设计 SQLite Schema
+- [ ] 配置 Drizzle ORM
 - [ ] 创建基础路由
-- [ ] 数据库 Schema 设计
-- [ ] Drizzle ORM 配置
 
 #### Week 2: 核心 API
 - [ ] Hono 服务器搭建
-- [ ] 用户认证系统
+- [ ] Bun.serve 配置
 - [ ] 项目 CRUD API
 - [ ] 会话 CRUD API
-- [ ] 基础中间件 (认证、CORS、日志)
-- [ ] 数据库迁移
+- [ ] 数据库初始化脚本
+- [ ] 基础中间件（CORS、日志）
 
 ### 阶段 2：AI 集成 (Week 3-4)
 
@@ -1399,6 +1216,7 @@ export default {
 - [ ] Vercel AI SDK 配置
 - [ ] Anthropic 集成
 - [ ] OpenAI 集成
+- [ ] Ollama 本地 LLM 集成
 - [ ] 流式响应处理
 - [ ] 工具调用框架
 
@@ -1414,7 +1232,7 @@ export default {
 **目标**: 实现 Web 应用界面
 
 #### Week 5: 基础 UI
-- [ ] 布局组件 (Sidebar, Header, Workspace)
+- [ ] 布局组件
 - [ ] 项目列表页
 - [ ] 项目详情页
 - [ ] 会话列表页
@@ -1441,656 +1259,337 @@ export default {
 - [ ] 权限配置界面
 - [ ] 主题切换
 
-### 阶段 4：高级特性 (Week 9-12)
+### 阶段 4：本地集成 (Week 9-10)
 
-**目标**: 实现差异化功能
+**目标**: 实现本地功能特性
 
-#### Week 9: LSP 集成
+#### Week 9: LSP 和 MCP
 - [ ] LSP 客户端
 - [ ] 代码补全
-- [ ] 跳转到定义
-- [ ] 诊断信息显示
-
-#### Week 10: MCP 支持
 - [ ] MCP 插件系统
 - [ ] 插件管理界面
-- [ ] OAuth 回调处理
-- [ ] 示例插件
 
-#### Week 11: 终端集成
+#### Week 10: 终端和实时
 - [ ] xterm.js 集成
 - [ ] PTY 管理
-- [ ] 命令执行 API
-- [ ] 输出流处理
-
-#### Week 12: 实时同步
+- [ ] 命令执行
 - [ ] WebSocket 服务器
-- [ ] 客户端 WebSocket
 - [ ] 实时消息推送
-- [ ] 文件变更同步
 
-### 阶段 5：测试与优化 (Week 13-14)
+### 阶段 5：打包和部署 (Week 11-12)
 
-**目标**: 保证质量和性能
+**目标**: 本地部署能力
 
-#### Week 13: 测试
-- [ ] 单元测试 (Vitest)
+#### Week 11: 打包
+- [ ] Bun 单文件打包
+- [ ] Docker 镜像构建
+- [ ] 安装脚本
+- [ ] 配置文件模板
+
+#### Week 12: 测试和文档
+- [ ] 单元测试
 - [ ] 集成测试
-- [ ] E2E 测试 (Playwright)
-- [ ] 覆盖率 80%+
+- [ ] E2E 测试
+- [ ] 部署文档
+- [ ] 用户手册
 
-#### Week 14: 性能优化
+### 阶段 6：优化和发布 (Week 13-14)
+
+**目标**: 生产就绪
+
+#### Week 13: 性能优化
 - [ ] 代码分割
 - [ ] 懒加载
-- [ ] 缓存策略
 - [ ] 数据库优化
-- [ ] CDN 配置
+- [ ] 内存优化
 
-### 阶段 6：部署与文档 (Week 15-16)
-
-**目标**: 上线生产环境
-
-#### Week 15: 部署
-- [ ] Cloudflare 配置
-- [ ] 数据库迁移
-- [ ] 环境变量配置
-- [ ] CI/CD 流水线
-- [ ] 监控和日志
-
-#### Week 16: 文档和发布
-- [ ] API 文档
-- [ ] 用户手册
-- [ ] 开发者文档
+#### Week 14: 发布
+- [ ] 版本发布
+- [ ] CI/CD 配置
+- [ ] Release Notes
 - [ ] 示例项目
-- [ ] 发布 v1.0
 
 ### 关键里程碑
 
 | 里程碑 | 目标 | 完成标准 |
 |--------|------|----------|
-| M1: MVP | 基础功能可用 | 可以创建项目、发送消息、AI 响应 |
-| M2: Alpha | 核心功能完整 | 文件操作、多 Agent、权限系统 |
-| M3: Beta | 高级特性完成 | LSP、MCP、终端、实时同步 |
-| M4: RC | 测试完成 | 80% 覆盖率、性能达标 |
-| M5: v1.0 | 生产就绪 | 部署上线、文档完善 |
+| M1: 本地 MVP | 本地可运行 | 可以在本地启动，基本功能可用 |
+| M2: 核心 API | API 完整 | 所有核心 API 端点实现 |
+| M3: 前端 Alpha | 基础 UI | 项目和会话管理可用 |
+| M4: Beta | 功能完整 | 所有计划功能实现 |
+| M5: v1.0 | 可部署 | 可打包为单文件或 Docker |
 
 ---
 
-## 8. 关键实现细节
+## 9. 关键实现细节
 
-### 8.1 流式响应处理
-
-```typescript
-// services/ai/stream.ts
-
-import { streamText } from 'ai';
-import { anthropic } from '@ai-sdk/anthropic';
-
-export async function streamResponse(
-  messages: Message[],
-  model: string = 'claude-sonnet-4-5'
-) {
-  const result = await streamText({
-    model: anthropic(model),
-    messages,
-    temperature: 0.7,
-    maxTokens: 4096,
-  });
-
-  return result.toDataStreamResponse();
-}
-
-// API 端点使用
-app.post('/api/sessions/:id/messages', async (c) => {
-  const { content } = await c.req.json();
-  const session = await getSession(c.req.param('id'));
-
-  const response = await streamResponse([
-    ...session.messages,
-    { role: 'user', content }
-  ]);
-
-  return response;
-});
-```
-
-### 8.2 工具调用实现
+### 9.1 本地文件系统访问
 
 ```typescript
-// tools/index.ts
+// src/services/FileService.ts
 
-import { Tool } from 'ai';
+import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
+import { join, resolve } from 'path';
 
-export const fileReadTool: Tool = {
-  description: '读取文件内容',
-  parameters: z.object({
-    path: z.string().describe('文件路径'),
-  }),
-  execute: async ({ path }) => {
-    const content = await fs.readFile(path, 'utf-8');
-    return { content };
-  },
-};
+export class FileService {
+  private projectRoot: string;
 
-export const fileWriteTool: Tool = {
-  description: '写入文件内容',
-  parameters: z.object({
-    path: z.string().describe('文件路径'),
-    content: z.string().describe('文件内容'),
-  }),
-  execute: async ({ path, content }) => {
-    await fs.writeFile(path, content, 'utf-8');
-    return { success: true };
-  },
-};
-
-export const fileSearchTool: Tool = {
-  description: '搜索文件内容',
-  parameters: z.object({
-    query: z.string().describe('搜索查询'),
-    path: z.string().optional().describe('搜索路径'),
-    filePattern: z.string().optional().describe('文件模式'),
-  }),
-  execute: async ({ query, path = '.', filePattern = '**/*' }) => {
-    const results = await searchFiles(query, path, filePattern);
-    return { results };
-  },
-};
-
-// 在 Agent 中使用
-const result = await streamText({
-  model: anthropic('claude-sonnet-4-5'),
-  messages,
-  tools: {
-    readFile: fileReadTool,
-    writeFile: fileWriteTool,
-    searchFiles: fileSearchTool,
-  },
-});
-```
-
-### 8.3 权限系统
-
-```typescript
-// services/permissions.ts
-
-interface PermissionRule {
-  agentType?: string;
-  resourceType: 'file' | 'directory' | 'command';
-  pattern: string; // glob pattern
-  action: 'allow' | 'deny' | 'ask';
-}
-
-export class PermissionManager {
-  private rules: PermissionRule[] = [];
-
-  addRule(rule: PermissionRule) {
-    this.rules.push(rule);
+  constructor(projectRoot: string) {
+    this.projectRoot = resolve(projectRoot);
   }
 
-  check(
-    agentType: string,
-    resourceType: string,
-    resourcePath: string
-  ): 'allow' | 'deny' | 'ask' {
-    // 按优先级排序规则
-    const sortedRules = this.rules
-      .filter(r => !r.agentType || r.agentType === agentType)
-      .filter(r => r.resourceType === resourceType)
-      .sort((a, b) => {
-        // 具体规则优先于通配符
-        const aSpecificity = a.pattern.split('/').length;
-        const bSpecificity = b.pattern.split('/').length;
-        return bSpecificity - aSpecificity;
-      });
+  async readFile(filePath: string): Promise<string> {
+    const fullPath = this.resolvePath(filePath);
+    return readFileSync(fullPath, 'utf-8');
+  }
 
-    for (const rule of sortedRules) {
-      if (this.matchPattern(resourcePath, rule.pattern)) {
-        return rule.action;
+  async writeFile(filePath: string, content: string): Promise<void> {
+    const fullPath = this.resolvePath(filePath);
+    writeFileSync(fullPath, content, 'utf-8');
+  }
+
+  async listFiles(dir: string = '.'): Promise<FileNode[]> {
+    const fullPath = this.resolvePath(dir);
+    const entries = readdirSync(fullPath, { withFileTypes: true });
+
+    return entries.map(entry => ({
+      name: entry.name,
+      path: join(dir, entry.name),
+      type: entry.isDirectory() ? 'directory' : 'file',
+    }));
+  }
+
+  private resolvePath(filePath: string): string {
+    const fullPath = resolve(this.projectRoot, filePath);
+
+    // 安全检查：防止路径遍历攻击
+    if (!fullPath.startsWith(this.projectRoot)) {
+      throw new Error('Access denied: path traversal attempt');
+    }
+
+    return fullPath;
+  }
+}
+```
+
+### 9.2 Ollama 本地 LLM 集成
+
+```typescript
+// src/providers/ollama.ts
+
+import { createOpenAI } from '@ai-sdk/openai';
+
+export function createOllamaProvider(baseURL: string = 'http://localhost:11434') {
+  const ollama = createOpenAI({
+    baseURL: `${baseURL}/v1`,
+    apiKey: 'ollama', // Ollama 不需要真实 API key
+  });
+
+  return {
+    chat: (model: string, messages: any[]) => {
+      return ollama.chat(model, messages);
+    },
+    stream: (model: string, messages: any[]) => {
+      return ollama.streamText(model, messages);
+    },
+    listModels: async () => {
+      const response = await fetch(`${baseURL}/api/tags`);
+      const data = await response.json();
+      return data.models;
+    },
+  };
+}
+
+// 使用
+const ollama = createOllamaProvider();
+const models = await ollama.listModels();
+console.log('Available models:', models);
+```
+
+### 9.3 WebSocket 实时通信
+
+```typescript
+// src/websocket/handler.ts
+
+interface WSClient {
+  ws: any; // Bun WebSocket
+  userId?: string;
+  subscriptions: Set<string>;
+}
+
+export class WebSocketServer {
+  private clients: Map<any, WSClient> = new Map();
+
+  handleOpen(ws: any) {
+    console.log('WebSocket client connected');
+    this.clients.set(ws, {
+      ws,
+      subscriptions: new Set(),
+    });
+  }
+
+  handleClose(ws: any) {
+    console.log('WebSocket client disconnected');
+    this.clients.delete(ws);
+  }
+
+  handleMessage(ws: any, message: string | Buffer) {
+    const client = this.clients.get(ws);
+    if (!client) return;
+
+    const data = JSON.parse(message.toString());
+
+    switch (data.type) {
+      case 'hello':
+        // 认证
+        client.userId = data.userId;
+        break;
+
+      case 'sub':
+        // 订阅频道
+        client.subscriptions.add(data.channel);
+        break;
+
+      case 'unsub':
+        // 取消订阅
+        client.subscriptions.delete(data.channel);
+        break;
+
+      case 'ping':
+        ws.send(JSON.stringify({ type: 'pong' }));
+        break;
+    }
+  }
+
+  broadcast(channel: string, message: any) {
+    for (const [ws, client] of this.clients) {
+      if (client.subscriptions.has(channel)) {
+        ws.send(JSON.stringify(message));
       }
     }
-
-    // 默认策略：询问
-    return 'ask';
-  }
-
-  private matchPattern(path: string, pattern: string): boolean {
-    // 使用 minimatch 或类似库
-    const minimatch = require('minimatch');
-    return minimatch(path, pattern);
   }
 }
-
-// 使用示例
-const pm = new PermissionManager();
-
-// BuildAgent 可以读写 src/
-pm.addRule({
-  agentType: 'build',
-  resourceType: 'file',
-  pattern: 'src/**/*',
-  action: 'allow',
-});
-
-// PlanAgent 只能读取
-pm.addRule({
-  agentType: 'plan',
-  resourceType: 'file',
-  pattern: '**/*',
-  action: 'ask',
-});
-
-pm.addRule({
-  agentType: 'plan',
-  resourceType: 'file',
-  pattern: '**/*.ts',
-  action: 'allow', // 只允许读取
-});
-
-// 检查权限
-const decision = pm.check('build', 'file', 'src/components/App.tsx');
-// 返回 'allow'
 ```
 
-### 8.4 LSP 客户端
+### 9.4 终端 PTY 集成
 
 ```typescript
-// services/lsp/client.ts
+// src/services/TerminalService.ts
 
-import { createClient } from 'lsp-client';
+import { spawn } from 'node-pty';
 
-export class LSPManager {
-  private clients: Map<string, any> = new Map();
+export class TerminalService {
+  private terminals: Map<string, any> = new Map();
 
-  async startServer(language: string, command: string, args: string[]) {
-    const client = createClient({
-      command,
-      args,
-      cwd: process.cwd(),
+  createSession(cwd: string): string {
+    const sessionId = crypto.randomUUID();
+
+    const pty = spawn('bash', [], {
+      name: 'xterm-color',
+      cwd,
+      env: process.env,
     });
 
-    await client.start();
-    this.clients.set(language, client);
-
-    // 等待服务器初始化
-    await this.waitForInitialized(client);
-  }
-
-  async getCompletions(
-    language: string,
-    file: string,
-    line: number,
-    column: number
-  ) {
-    const client = this.clients.get(language);
-    if (!client) return [];
-
-    const result = await client.completion(file, line, column);
-    return result.items;
-  }
-
-  async getDefinition(
-    language: string,
-    file: string,
-    line: number,
-    column: number
-  ) {
-    const client = this.clients.get(language);
-    if (!client) return null;
-
-    const result = await client.definition(file, line, column);
-    return result;
-  }
-
-  private async waitForInitialized(client: any) {
-    return new Promise((resolve) => {
-      client.onNotification('window/logMessage', () => {
-        // 服务器已初始化
-        resolve(true);
+    pty.onData((data: string) => {
+      // 通过 WebSocket 发送输出
+      wsServer.broadcast(`terminal:${sessionId}`, {
+        type: 'terminal_output',
+        sessionId,
+        output: data,
       });
     });
-  }
-}
-```
 
-### 8.5 WebSocket 实时同步
-
-```typescript
-// services/sync/server.ts
-
-import { WebSocket } from 'bun';
-
-export class SyncServer {
-  private clients: Map<string, WebSocket> = new Map();
-
-  handleUpgrade(req: Request) {
-    const upgrade = req.headers.get('Upgrade');
-    if (upgrade !== 'websocket') return null;
-
-    const url = new URL(req.url);
-    const sessionId = url.searchParams.get('sessionId');
-
-    if (!sessionId) return null;
-
-    const server = Bun.serve<{
-      sessionId: string;
-    }>({
-      fetch: (req, server) => {
-        const upgraded = server.upgrade(req);
-        if (!upgraded) return new Response('Upgrade failed', { status: 500 });
-        return new Response('Upgrade successful');
-      },
-      websocket: {
-        message: (ws, message) => {
-          // 处理客户端消息
-          const data = JSON.parse(message.toString());
-
-          switch (data.type) {
-            case 'ping':
-              ws.send(JSON.stringify({ type: 'pong' }));
-              break;
-            // ...
-          }
-        },
-        open: (ws) => {
-          console.log('Client connected');
-          this.clients.set(sessionId!, ws);
-        },
-        close: (ws) => {
-          console.log('Client disconnected');
-          this.clients.delete(sessionId!);
-        },
-      },
-    });
-
-    return server;
+    this.terminals.set(sessionId, pty);
+    return sessionId;
   }
 
-  broadcast(sessionId: string, message: any) {
-    const client = this.clients.get(sessionId);
-    if (client) {
-      client.send(JSON.stringify(message));
-    }
-  }
-}
-
-// 在 API 中使用
-const syncServer = new SyncServer();
-
-app.post('/api/sessions/:id/messages', async (c) => {
-  const sessionId = c.req.param('id');
-  const { content } = await c.req.json();
-
-  // 发送开始事件
-  syncServer.broadcast(sessionId, {
-    type: 'agent_start',
-    agentType: 'build',
-  });
-
-  // 调用 AI
-  const response = await streamResponse(...);
-
-  // 发送进度更新
-  syncServer.broadcast(sessionId, {
-    type: 'agent_progress',
-    progress: 50,
-  });
-
-  // ...
-});
-```
-
-### 8.6 文件搜索实现
-
-```typescript
-// services/files/search.ts
-
-import { glob } from 'glob';
-import { readFile } from 'fs/promises';
-import * as ignore from 'ignore';
-
-interface SearchResult {
-  filePath: string;
-  lineNumber: number;
-  content: string;
-  matches: Array<{
-    start: number;
-    end: number;
-    text: string;
-  }>;
-}
-
-export async function searchFiles(
-  query: string,
-  path: string = '.',
-  options: {
-    filePattern?: string;
-    caseSensitive?: boolean;
-    regex?: boolean;
-    maxResults?: number;
-  } = {}
-): Promise<SearchResult[]> {
-  const {
-    filePattern = '**/*',
-    caseSensitive = false,
-    regex = false,
-    maxResults = 100,
-  } = options;
-
-  // 加载 .gitignore
-  const ig = ignore();
-  try {
-    const gitignore = await readFile('.gitignore', 'utf-8');
-    ig.add(gitignore);
-  } catch {
-    // 忽略错误
-  }
-
-  // 匹配文件
-  const files = await glob(filePattern, {
-    cwd: path,
-    ignore: ['**/node_modules/**', '**/.git/**'],
-  });
-
-  const results: SearchResult[] = [];
-  let resultCount = 0;
-
-  for (const file of files) {
-    if (resultCount >= maxResults) break;
-    if (ig.ignores(file)) continue;
-
-    try {
-      const content = await readFile(file, 'utf-8');
-      const lines = content.split('\n');
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const matches = findMatches(line, query, { caseSensitive, regex });
-
-        if (matches.length > 0) {
-          results.push({
-            filePath: file,
-            lineNumber: i + 1,
-            content: line,
-            matches,
-          });
-          resultCount++;
-
-          if (resultCount >= maxResults) break;
-        }
-      }
-    } catch {
-      // 忽略读取错误
+  execute(sessionId: string, command: string) {
+    const pty = this.terminals.get(sessionId);
+    if (pty) {
+      pty.write(command + '\n');
     }
   }
 
-  return results;
-}
-
-function findMatches(
-  text: string,
-  query: string,
-  options: { caseSensitive: boolean; regex: boolean }
-) {
-  const { caseSensitive, regex } = options;
-  const matches: Array<{ start: number; end: number; text: string }> = [];
-
-  const searchRegex = regex
-    ? new RegExp(query, caseSensitive ? 'g' : 'gi')
-    : new RegExp(escapeRegExp(query), caseSensitive ? 'g' : 'gi');
-
-  let match;
-  while ((match = searchRegex.exec(text)) !== null) {
-    matches.push({
-      start: match.index,
-      end: match.index + match[0].length,
-      text: match[0],
-    });
+  close(sessionId: string) {
+    const pty = this.terminals.get(sessionId);
+    if (pty) {
+      pty.kill();
+      this.terminals.delete(sessionId);
+    }
   }
-
-  return matches;
-}
-
-function escapeRegExp(text: string) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 ```
 
----
+### 9.5 本地 Git 集成
 
-## 9. 部署策略
-
-### 9.1 Cloudflare 部署
-
-#### SST 配置
 ```typescript
-// sst.config.ts
+// src/tools/git.ts
 
-export default {
-  config(input) {
+import { execSync } from 'child_process';
+import { join } from 'path';
+
+export class GitService {
+  private projectPath: string;
+
+  constructor(projectPath: string) {
+    this.projectPath = projectPath;
+  }
+
+  async getStatus(): Promise<GitStatus> {
+    const output = execSync('git status --porcelain', {
+      cwd: this.projectPath,
+      encoding: 'utf-8',
+    });
+
+    // 解析输出
+    const files = output.split('\n').filter(Boolean).map(line => ({
+      status: line.slice(0, 2),
+      path: line.slice(3),
+    }));
+
     return {
-      name: 'opencode-web',
-      region: 'us-east-1',
-      profile: 'default',
-      stage: input.stage || 'dev',
+      branch: this.getCurrentBranch(),
+      files,
     };
-  },
-  stacks(app) {
-    app.stack(function api({ stack }) {
-      // API Worker
-      const api = new Worker(stack, 'ApiWorker', {
-        handler: './src/server.ts',
-        bindings: {
-          DATABASE: new Database(stack, 'Database', {
-            databaseName: 'opencode',
-          }),
-          BUCKET: new Bucket(stack, 'Bucket'),
-        },
-        url: true,
-      });
+  }
 
-      // 站点
-      new Site(stack, 'Site', {
-        url: api.url,
-      });
+  async commit(message: string): Promise<string> {
+    const output = execSync(`git commit -m ${JSON.stringify(message)}`, {
+      cwd: this.projectPath,
+      encoding: 'utf-8',
     });
-  },
-};
+    return output;
+  }
+
+  private getCurrentBranch(): string {
+    return execSync('git rev-parse --abbrev-ref HEAD', {
+      cwd: this.projectPath,
+      encoding: 'utf-8',
+    }).trim();
+  }
+}
 ```
 
-#### Worker 脚本
+### 9.6 数据库迁移
+
 ```typescript
-// src/server.ts
+// src/db/migrate.ts
 
-import { Hono } from 'hono';
-import { bearerAuth } from 'hono/bearer-auth';
+import Database from 'bun:sqlite';
+import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
+import { drizzle } from 'drizzle-orm/bun-sqlite';
+import * as schema from './schema';
 
-type Bindings = {
-  DATABASE: D1Database;
-  BUCKET: R2Bucket;
-  JWT_SECRET: string;
-};
+export async function runMigrations(dbPath: string) {
+  const sqlite = new Database(dbPath);
+  const db = drizzle(sqlite, { schema });
 
-const app = new Hono<{ Bindings: Bindings }>();
+  // 运行迁移
+  await migrate(db, { migrationsFolder: './drizzle' });
 
-// 认证中间件
-app.use('*', bearerAuth({ token: (c) => c.env.JWT_SECRET }));
-
-// 路由
-app.get('/api/projects', async (c) => {
-  const { results } = await c.env.DATABASE.prepare(
-    'SELECT * FROM projects'
-  ).all();
-
-  return c.json(results);
-});
-
-// 文件上传
-app.put('/api/files/:path', async (c) => {
-  const path = c.req.param('path');
-  const content = await c.req.arrayBuffer();
-
-  await c.env.BUCKET.put(path, content);
-
-  return c.json({ success: true });
-});
-
-export default app;
-```
-
-### 9.2 环境变量
-
-```bash
-# .env.production
-DATABASE_URL=postgresql://user:pass@host:5432/dbname
-REDIS_URL=redis://host:6379
-JWT_SECRET=your-secret-key
-ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...
-GROQ_API_KEY=gsk_...
-
-# Cloudflare
-CLOUDFLARE_ACCOUNT_ID=your-account-id
-CLOUDFLARE_API_TOKEN=your-api-token
-R2_BUCKET_NAME=opencode-files
-```
-
-### 9.3 CI/CD 流水线
-
-```yaml
-# .github/workflows/deploy.yml
-
-name: Deploy
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-      - run: bun install
-      - run: bun test
-      - run: bun run typecheck
-
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: oven-sh/setup-bun@v1
-      - run: bun install
-      - run: bun run build
-      - name: Deploy to Cloudflare
-        run: bunx sst deploy --stage production
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  console.log('✅ Migrations completed');
+  sqlite.close();
+}
 ```
 
 ---
@@ -2100,29 +1599,41 @@ jobs:
 ### 10.1 单元测试
 
 ```typescript
-// __tests__/services/permissions.test.ts
+// __tests__/services/FileService.test.ts
 
-import { describe, it, expect } from 'vitest';
-import { PermissionManager } from '@/services/permissions';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { FileService } from '@/services/FileService';
+import { tmpdir } from 'os';
+import { mkdirSync, writeFileSync } from 'fs';
 
-describe('PermissionManager', () => {
-  it('should allow file access when rule matches', () => {
-    const pm = new PermissionManager();
-    pm.addRule({
-      agentType: 'build',
-      resourceType: 'file',
-      pattern: 'src/**/*',
-      action: 'allow',
-    });
+describe('FileService', () => {
+  let service: FileService;
+  let tempDir: string;
 
-    const decision = pm.check('build', 'file', 'src/components/App.tsx');
-    expect(decision).toBe('allow');
+  beforeEach(() => {
+    tempDir = `${tmpdir()}/test-${Date.now()}`;
+    mkdirSync(tempDir, { recursive: true });
+    service = new FileService(tempDir);
   });
 
-  it('should deny when no rule matches', () => {
-    const pm = new PermissionManager();
-    const decision = pm.check('build', 'file', 'unknown.txt');
-    expect(decision).toBe('ask'); // 默认
+  it('should read file content', async () => {
+    const testFile = `${tempDir}/test.txt`;
+    writeFileSync(testFile, 'Hello, World!');
+
+    const content = await service.readFile('test.txt');
+    expect(content).toBe('Hello, World!');
+  });
+
+  it('should write file content', async () => {
+    await service.writeFile('new.txt', 'New content');
+
+    const content = await service.readFile('new.txt');
+    expect(content).toBe('New content');
+  });
+
+  it('should prevent path traversal', async () => {
+    await expect(service.readFile('../../../etc/passwd'))
+      .toThrow('Access denied');
   });
 });
 ```
@@ -2130,18 +1641,19 @@ describe('PermissionManager', () => {
 ### 10.2 集成测试
 
 ```typescript
-// __tests__/api/sessions.test.ts
+// __tests__/api/projects.test.ts
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import { serve } from 'bun';
-import { api } from '@/server';
+import { api } from '@/routes';
 
-describe('Sessions API', () => {
+describe('Projects API', () => {
   let server: any;
+  const port = 3002;
 
   beforeAll(() => {
     server = serve({
-      port: 3001,
+      port,
       fetch: api.fetch,
     });
   });
@@ -2150,20 +1662,28 @@ describe('Sessions API', () => {
     server.stop();
   });
 
-  it('should create a session', async () => {
-    const response = await fetch('http://localhost:3001/api/sessions', {
+  it('should create a project', async () => {
+    const response = await fetch(`http://localhost:${port}/api/projects`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        projectId: 'proj-123',
-        agentType: 'build',
+        name: 'Test Project',
+        path: '/tmp/test-project',
       }),
     });
 
     expect(response.status).toBe(201);
     const data = await response.json();
     expect(data).toHaveProperty('id');
-    expect(data.agentType).toBe('build');
+    expect(data.name).toBe('Test Project');
+  });
+
+  it('should list projects', async () => {
+    const response = await fetch(`http://localhost:${port}/api/projects`);
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(Array.isArray(data.projects)).toBe(true);
   });
 });
 ```
@@ -2177,94 +1697,213 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Project Management', () => {
   test('should create a new project', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('http://localhost:3000');
     await page.click('text=创建新项目');
 
     await page.fill('input[name="name"]', 'Test Project');
     await page.fill('input[name="path"]', '/tmp/test-project');
     await page.click('button[type="submit"]');
 
-    await expect(page).toHaveURL('/projects/proj-*');
+    await expect(page).toHaveURL(/\/projects\/.+$/);
     await expect(page.locator('h1')).toContainText('Test Project');
   });
 
   test('should send a message to AI', async ({ page }) => {
-    await page.goto('/projects/proj-123/sessions/sess-456');
+    await page.goto('http://localhost:3000/projects/test/sessions/new');
 
-    await page.fill('textarea[placeholder="输入你的问题..."]', 'Hello AI');
+    await page.fill('textarea', 'Hello AI');
     await page.click('button[aria-label="Send"]');
 
     // 等待 AI 响应
     await expect(page.locator('.message-assistant')).toBeVisible();
-    await expect(page.locator('.message-assistant .message-content')).toContainText(
-      /Hello/i
-    );
+    await expect(page.locator('.message-assistant')).toContainText(/Hello/i);
   });
 });
 ```
 
-### 10.4 测试覆盖率目标
+### 10.4 性能测试
 
-| 类型 | 目标覆盖率 | 工具 |
-|------|-----------|------|
-| 单元测试 | 80%+ | Vitest |
-| 集成测试 | 70%+ | Vitest |
-| E2E 测试 | 关键流程 100% | Playwright |
+```typescript
+// __tests__/performance/load.test.ts
+
+import { describe, it, expect } from 'bun:test';
+
+describe('Load Tests', () => {
+  it('should handle 100 concurrent requests', async () => {
+    const requests = Array.from({ length: 100 }, (_, i) =>
+      fetch('http://localhost:3000/api/projects')
+    );
+
+    const start = Date.now();
+    const responses = await Promise.all(requests);
+    const duration = Date.now() - start;
+
+    expect(responses.every(r => r.ok)).toBe(true);
+    expect(duration).toBeLessThan(5000); // 5秒内完成
+  });
+});
+```
 
 ---
 
 ## 附录
 
-### A. 技术对比
+### A. 技术对比（本地部署版）
 
-| 技术 | OpenCode 选择 | 本方案选择 | 原因 |
-|------|---------------|-----------|------|
-| 前端框架 | SolidJS | SolidJS | 高性能、细粒度响应 |
-| 构建工具 | Vite | Vite | 快速、现代 |
-| 后端框架 | Hono | Hono | Cloudflare 原生 |
-| 运行时 | Bun | Bun | 极速、TypeScript 原生 |
-| AI SDK | Vercel AI SDK | Vercel AI SDK | 多提供商支持 |
-| 数据库 | MySQL + Drizzle | PostgreSQL + Drizzle | 更强大的功能 |
-| ORM | Drizzle | Drizzle | 类型安全、轻量 |
+| 技术 | 云版本 | 本地版本 | 原因 |
+|------|--------|---------|------|
+| 数据库 | MySQL | SQLite | 零配置、单文件 |
+| 文件存储 | R2/S3 | 本地文件系统 | 直接访问 |
+| 缓存 | Redis | 内存/Redis | 简化部署 |
+| HTTP 服务器 | Cloudflare Workers | Bun.serve | 本地运行 |
+| WebSocket | Durable Objects | Bun WebSocket | 内置支持 |
+| AI 提供商 | 全部 | 全部 + Ollama | 本地 LLM 选项 |
+| 部署方式 | SST + Cloudflare | Docker / 单文件 | 本地控制 |
 
-### B. 参考资源
+### B. 环境变量
 
-- [SolidJS 文档](https://www.solidjs.com/)
-- [Hono 文档](https://hono.dev/)
-- [Vercel AI SDK 文档](https://sdk.vercel.ai/)
-- [Drizzle ORM 文档](https://orm.drizzle.team/)
-- [Cloudflare Workers 文档](https://developers.cloudflare.com/workers/)
-- [SST 文档](https://sst.dev/)
-- [OpenCode 源码](vendor/opencode/)
+```bash
+# .env.example
 
-### C. 常见问题
+# 服务器配置
+PORT=3000
+HOST=localhost
 
-**Q: 为什么选择 SolidJS 而不是 React？**
-A: SolidJS 具有更细粒度的响应式系统，性能更优，且无需虚拟 DOM。对于需要频繁更新的聊天界面和文件编辑器，SolidJS 能提供更流畅的用户体验。
+# 数据库
+DATABASE_URL=./data/opencode.db
+# 或使用 PostgreSQL:
+# DATABASE_URL=postgresql://user:pass@localhost:5432/opencode
 
-**Q: 为什么选择 Cloudflare Workers 而不是 Vercel/AWS Lambda？**
-A: Cloudflare Workers 提供全球边缘计算网络，延迟更低。同时，它与 Hono 完美集成，开发体验更好。
+# Redis（可选）
+REDIS_URL=redis://localhost:6379
 
-**Q: 数据库为什么选择 PostgreSQL 而不是 MySQL？**
-A: PostgreSQL 提供更强大的 JSON 支持、全文搜索、并发控制等特性，更适合复杂的数据模型和查询需求。
+# AI 提供商 API Keys
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+GOOGLE_API_KEY=...
+GROQ_API_KEY=gsk_...
 
-**Q: 如何实现离线功能？**
-A: 可以使用 Service Worker + IndexedDB 实现离线缓存。SolidJS 可以配合 PWA 插件实现离线优先的应用。
+# Ollama（本地 LLM）
+OLLAMA_BASE_URL=http://localhost:11434
 
-**Q: 如何保证 AI 响应的安全性？**
-A: 通过权限系统控制 Agent 的访问范围，对敏感操作（如文件写入、命令执行）使用 "ask" 策略，需要用户确认。
+# 安全
+JWT_SECRET=your-secret-key-change-this
+ENCRYPTION_KEY=your-encryption-key
+
+# 日志
+LOG_LEVEL=info
+LOG_FILE=./data/opencode.log
+
+# 文件存储
+DATA_DIR=./data
+PROJECTS_DIR=./projects
+
+# LSP
+LSP_SERVERS_DIR=./data/lsp
+
+# 限制
+MAX_FILE_SIZE=10485760  # 10MB
+MAX_UPLOAD_SIZE=52428800  # 50MB
+RATE_LIMIT_REQUESTS=100
+RATE_LIMIT_WINDOW=60000  # 1分钟
+```
+
+### C. 目录结构
+
+```
+opencode-web/
+├── bin/                     # 可执行文件
+│   └── opencode-server
+├── data/                    # 数据目录
+│   ├── opencode.db         # SQLite 数据库
+│   ├── opencode.log        # 日志文件
+│   └── lsp/                # LSP 服务器
+├── projects/                # 项目目录
+│   └── user-projects/
+├── dist/                    # 构建产物
+│   ├── server.bundle.js    # 后端 bundle
+│   └── assets/             # 前端资源
+├── drizzle/                 # 数据库迁移
+├── scripts/                 # 脚本
+│   ├── build.ts
+│   ├── bundle.ts
+│   └── migrate.ts
+├── src/                     # 源代码
+│   ├── server.ts
+│   ├── routes/
+│   ├── services/
+│   ├── agents/
+│   ├── tools/
+│   ├── providers/
+│   ├── middleware/
+│   ├── db/
+│   └── websocket/
+├── frontend/                # 前端代码
+│   ├── src/
+│   ├── public/
+│   └── package.json
+├── tests/                   # 测试
+│   ├── unit/
+│   ├── integration/
+│   └── e2e/
+├── docker/
+│   ├── Dockerfile
+│   └── docker-compose.yml
+├── package.json
+├── bun.lockb
+├── tsconfig.json
+├── tailwind.config.js
+└── README.md
+```
+
+### D. 常见问题
+
+**Q: SQLite 够用吗？什么时候需要 PostgreSQL？**
+A: SQLite 适合个人和小团队使用（< 100 用户），当并发量大或需要更强大的数据库功能时，可以切换到 PostgreSQL。
+
+**Q: 如何支持离线模式？**
+A: 使用 Ollama 运行本地 LLM（如 Llama 3），所有数据都在本地，完全离线可用。
+
+**Q: 如何备份数据？**
+A: 定期复制 `./data` 目录，或者使用 SQLite 的 `.backup` 命令。
+
+**Q: 如何升级？**
+A: 停止服务器 → 备份数据 → 替换可执行文件 → 运行迁移 → 重启服务器。
+
+**Q: 能否与现有 Git 仓库集成？**
+A: 可以，项目直接指向本地 Git 仓库路径即可。
 
 ---
 
 ## 总结
 
-本开发计划提供了从零开始构建 OpenCode Web 应用的完整路线图和架构设计。关键要点：
+本开发计划提供了从零开始构建**本地部署版** OpenCode Web 应用的完整方案：
 
-1. **技术栈**: SolidJS + Bun + Hono + Vercel AI SDK + Cloudflare
-2. **架构**: 客户端-服务端分离，支持实时同步
-3. **开发周期**: 16 周，分为 6 个阶段
-4. **核心功能**: 多 AI 提供商、多 Agent、文件操作、会话管理、LSP/MCP、终端集成
-5. **部署**: Cloudflare Workers + Pages
-6. **测试**: 单元 + 集成 + E2E，80%+ 覆盖率
+### 关键特性
 
-通过遵循此计划，您可以构建一个功能完善、性能优秀的 AI 编程助手 Web 应用。
+1. **零云依赖**：所有组件可在本地运行
+2. **灵活部署**：单文件、Docker、系统服务多种方式
+3. **数据隐私**：所有数据存储在本地
+4. **易于使用**：一行命令启动
+5. **功能完整**：保留所有核心功能
+6. **本地 LLM**：支持 Ollama 等本地模型
+
+### 技术栈
+
+- **前端**：SolidJS + Vite + TailwindCSS
+- **后端**：Bun + Hono + Drizzle
+- **数据库**：SQLite（默认）/ PostgreSQL（可选）
+- **AI**：Vercel AI SDK + Ollama
+- **部署**：Docker / 单文件可执行
+
+### 开发周期
+
+14-16 周，分为 6 个阶段：
+1. 基础架构（2 周）
+2. AI 集成（2 周）
+3. 前端开发（4 周）
+4. 本地集成（2 周）
+5. 打包部署（2 周）
+6. 优化发布（2-4 周）
+
+通过遵循此计划，您可以构建一个完全自主可控、易于部署的 AI 编程助手。
