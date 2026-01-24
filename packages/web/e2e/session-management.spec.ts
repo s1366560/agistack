@@ -17,12 +17,12 @@ async function login(page: Page) {
   await page.waitForURL('/', { timeout: 5000 })
 }
 
-describe('会话管理 E2E 测试', () => {
+test.describe('会话管理 E2E 测试', () => {
   test.beforeEach(async ({ page }) => {
     await login(page)
   })
 
-  describe('会话创建', () => {
+  test.describe('会话创建', () => {
     test('用户应该能够创建新会话', async ({ page }) => {
       // 在首页点击"新建对话"
       await page.click('button:has-text("新建对话")')
@@ -70,7 +70,7 @@ describe('会话管理 E2E 测试', () => {
     })
   })
 
-  describe('会话列表', () => {
+  test.describe('会话列表', () => {
     test('应该在首页显示会话列表', async ({ page }) => {
       // 应该在首页
       expect(page.url()).toContain('/')
@@ -137,7 +137,7 @@ describe('会话管理 E2E 测试', () => {
     })
   })
 
-  describe('会话切换', () => {
+  test.describe('会话切换', () => {
     test('应该能够切换会话', async ({ page }) => {
       // 创建第一个会话
       await page.click('button:has-text("新建对话")')
@@ -201,7 +201,7 @@ describe('会话管理 E2E 测试', () => {
     })
   })
 
-  describe('会话删除', () => {
+  test.describe('会话删除', () => {
     test('应该能够删除会话', async ({ page }) => {
       // 创建会话
       await page.click('button:has-text("新建对话")')
@@ -270,7 +270,7 @@ describe('会话管理 E2E 测试', () => {
     })
   })
 
-  describe('会话重命名', () => {
+  test.describe('会话重命名', () => {
     test('应该能够重命名会话', async ({ page }) => {
       // 创建会话
       await page.click('button:has-text("新建对话")')
@@ -316,7 +316,7 @@ describe('会话管理 E2E 测试', () => {
     })
   })
 
-  describe('会话搜索', () => {
+  test.describe('会话搜索', () => {
     test.beforeEach(async ({ page }) => {
       // 创建多个会话用于测试搜索
       for (let i = 0; i < 3; i++) {
@@ -378,7 +378,7 @@ describe('会话管理 E2E 测试', () => {
     })
   })
 
-  describe('会话持久化', () => {
+  test.describe('会话持久化', () => {
     test('刷新页面后应该保持会话状态', async ({ page }) => {
       // 创建会话
       await page.click('button:has-text("新建对话")')
@@ -419,7 +419,7 @@ describe('会话管理 E2E 测试', () => {
     })
   })
 
-  describe('会话排序', () => {
+  test.describe('会话排序', () => {
     test('会话应该按更新时间排序', async ({ page }) => {
       // 创建第一个会话
       await page.click('button:has-text("新建对话")')
@@ -477,7 +477,7 @@ describe('会话管理 E2E 测试', () => {
     })
   })
 
-  describe('性能测试', () => {
+  test.describe('性能测试', () => {
     test('会话列表应该在100ms内加载', async ({ page }) => {
       const startTime = Date.now()
 

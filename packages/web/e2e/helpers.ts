@@ -1,210 +1,223 @@
 /**
- * E2E Test Helpers
+ * E2E 测试全局设置和 Fixtures
  *
- * Reusable helper functions for E2E tests
+ * 提供测试辅助函数和全局配置
  */
 
-import { Page, BrowserContext } from '@playwright/test';
+import { test as base } from '@playwright/test'
 
-/**
- * Test user credentials
- */
-export const TEST_USERS = {
-  regular: {
-    email: 'test@example.com',
-    password: 'TestPassword123!',
-  },
-  admin: {
-    email: 'admin@example.com',
-    password: 'AdminPassword123!',
-  },
-};
+// 定义测试辅助函数
+export const test = base.extend({
+  // 自定义页面对象
+  page: async ({ page }, use) => {
+    // 设置默认超时
+    page.setDefaultTimeout(10000)
 
-/**
- * Login helper function
- */
-export async function login(
-  page: Page,
-  user: keyof typeof TEST_USERS = 'regular'
-): Promise<void> {
-  const credentials = TEST_USERS[user];
+    // 监听页面错误
+    page.on('pageerror', (error) => {
+      console.error('Page error:', error)
+    })
 
-  await page.goto('/login');
-  await page.fill('input[name="email"]', credentials.email);
-  await page.fill('input[name="password"]', credentials.password);
-  await page.click('button[type="submit"]');
-
-  // Wait for redirect to projects page
-  await page.waitForURL(/\/projects/, { timeout: 5000 });
-}
-
-/**
- * Logout helper function
- */
-export async function logout(page: Page): Promise<void> {
-  await page.click('[data-testid="logout-button"]');
-  await page.waitForURL(/\//, { timeout: 5000 });
-}
-
-/**
- * Create test project helper
- */
-export async function createTestProject(
-  page: Page,
-  name?: string
-): Promise<string> {
-  const projectName = name || `Test Project ${Date.now()}`;
-
-  await page.click('[data-testid="create-project-button"]');
-  await page.fill('input[name="name"]', projectName);
-  await page.fill('textarea[name="description"]', 'This is a test project');
-  await page.click('button[type="submit"]');
-
-  // Wait for success message
-  await page.waitForSelector('text=项目创建成功', { timeout: 5000 });
-
-  return projectName;
-}
-
-/**
- * Create test session helper
- */
-export async function createTestSession(page: Page): Promise<void> {
-  await page.click('[data-testid="create-session-button"]');
-  // Wait for session to be created
-  await page.waitForURL(/\/sessions\/[\w-]+/, { timeout: 5000 });
-}
-
-/**
- * Send chat message helper
- */
-export async function sendChatMessage(
-  page: Page,
-  message: string
-): Promise<void> {
-  await page.fill('[data-testid="message-input"]', message);
-  await page.click('[data-testid="send-button"]');
-
-  // Wait for message to appear
-  await page.waitForSelector(`text=${message}`, { timeout: 5000 });
-}
-
-/**
- * Wait for AI response helper
- */
-export async function waitForAIResponse(page: Page): Promise<void> {
-  // Wait for streaming to complete
-  await page.waitForSelector('[data-testid="ai-message"]', { timeout: 15000 });
-  await page.waitForSelector('[data-testid="streaming-indicator"]', { state: 'hidden', timeout: 15000 });
-}
-
-/**
- * Clear test data helper
- */
-export async function clearTestData(context: BrowserContext): Promise<void> {
-  // Clear localStorage
-  await context.clearCookies();
-
-  // Clear IndexedDB if needed
-  await context.evaluate(() => {
-    localStorage.clear();
-    sessionStorage.clear();
-  });
-}
-
-/**
- * Setup test database state
- */
-export async function setupTestDatabase(): Promise<void> {
-  // This would typically call an API endpoint to reset the test database
-  // For now, it's a placeholder
-  console.log('Setting up test database...');
-}
-
-/**
- * Teardown test database state
- */
-export async function teardownTestDatabase(): Promise<void> {
-  // This would typically call an API endpoint to clean up test data
-  // For now, it's a placeholder
-  console.log('Tearing down test database...');
-}
-
-/**
- * Take screenshot on failure
- */
-export async function screenshotOnFailure(
-  page: Page,
-  testName: string
-): Promise<void> {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const filename = `failure-${testName}-${timestamp}.png`;
-
-  await page.screenshot({
-    path: `test-results/screenshots/${filename}`,
-    fullPage: true,
-  });
-}
-
-/**
- * Mock API responses
- */
-export function mockApiResponse(endpoint: string, response: any): void {
-  // This would typically use MSW (Mock Service Worker)
-  // For now, it's a placeholder
-  console.log(`Mocking API response for ${endpoint}`);
-}
-
-/**
- * Generate test data
- */
-export const testDataGenerators = {
-  email: () => `test-${Date.now()}@example.com`,
-  password: () => 'TestPassword123!',
-  projectName: () => `Test Project ${Date.now()}`,
-  message: () => `Test message ${Date.now()}`,
-};
-
-/**
- * Wait for element to be stable (not animating)
- */
-export async function waitForStable(
-  page: Page,
-  selector: string,
-  timeout = 5000
-): Promise<void> {
-  await page.waitForSelector(selector, { state: 'visible', timeout });
-
-  // Wait for bounding box to stabilize
-  await page.waitForFunction((sel) => {
-    const element = document.querySelector(sel);
-    if (!element) return false;
-
-    const rect = element.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0;
-  }, selector, { timeout });
-}
-
-/**
- * Retry function with exponential backoff
- */
-export async function retry<T>(
-  fn: () => Promise<T>,
-  maxRetries = 3,
-  delay = 1000
-): Promise<T> {
-  let lastError: Error | undefined;
-
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error as Error;
-      if (i < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)));
+    // 监听控制台消息
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') {
+        console.error('Console error:', msg.text())
       }
-    }
+    })
+
+    await use(page)
+  },
+})
+
+/**
+ * 测试辅助函数
+ */
+export class TestHelpers {
+  constructor(private page: Page) {}
+
+  /**
+   * 登录用户
+   */
+  async login(email = 'test@example.com', password = 'password123') {
+    await this.page.goto('/login')
+    await this.page.fill('input[name="email"]', email)
+    await this.page.fill('input[name="password"]', password)
+    await this.page.click('button[type="submit"]')
+    await this.page.waitForURL('/', { timeout: 5000 })
   }
 
-  throw lastError;
+  /**
+   * 创建测试会话
+   */
+  async createSession() {
+    await this.page.click('button:has-text("新建对话")')
+    await this.page.waitForURL(/\/chat\/.*/, { timeout: 5000 })
+  }
+
+  /**
+   * 发送消息
+   */
+  async sendMessage(message: string) {
+    const input = this.page.locator('textarea[aria-label="消息输入框"]')
+    const sendButton = this.page.locator('button[aria-label="发送消息"]')
+
+    await input.fill(message)
+    await sendButton.click()
+
+    // 等待消息发送
+    await this.page.waitForSelector(`[data-message-role="user"]:has-text("${message.slice(0, 20)}")`, {
+      timeout: 5000
+    })
+  }
+
+  /**
+   * 等待AI响应
+   */
+  async waitForResponse() {
+    return this.page.waitForSelector('[data-message-role="assistant"]', {
+      timeout: 30000
+    })
+  }
+
+  /**
+   * 获取最后一条消息
+   */
+  async getLastMessage(role: 'user' | 'assistant') {
+    const message = this.page.locator(`[data-message-role="${role}"]`).last()
+    return await message.textContent()
+  }
+
+  /**
+   * 等待加载完成
+   */
+  async waitForLoad() {
+    await this.page.waitForLoadState('networkidle')
+  }
+
+  /**
+   * 截图（用于调试）
+   */
+  async screenshot(name: string) {
+    await this.page.screenshot({
+      path: `test-results/screenshots/${name}.png`,
+      fullPage: true
+    })
+  }
+}
+
+/**
+ * 测试数据生成器
+ */
+export class TestDataGenerator {
+  /**
+   * 生成随机用户邮箱
+   */
+  static randomEmail() {
+    return `test-${Date.now()}@example.com`
+  }
+
+  /**
+   * 生成随机用户名
+   */
+  static randomUsername() {
+    return `user_${Date.now()}`
+  }
+
+  /**
+   * 生成随机消息内容
+   */
+  static randomMessage() {
+    const messages = [
+      'Hello AI',
+      'How are you?',
+      'What can you do?',
+      'Tell me a joke',
+      'Help me with code'
+    ]
+    return messages[Math.floor(Math.random() * messages.length)]
+  }
+
+  /**
+   * 生成长文本
+   */
+  static longText(length: number) {
+    return 'A'.repeat(length)
+  }
+
+  /**
+   * 生成包含特殊字符的文本
+   */
+  static specialCharsText() {
+    return 'Test: < > & " \' \n \t @ # $ % ^ * ( ) _ + - = { } [ ] | \\ : ; " \' < > , . ? /'
+  }
+}
+
+/**
+ * 断言辅助函数
+ */
+export class Assertions {
+  constructor(private page: Page) {}
+
+  /**
+   * 验证元素可见
+   */
+  async isVisible(selector: string) {
+    const element = this.page.locator(selector)
+    return await element.isVisible()
+  }
+
+  /**
+   * 验证元素包含文本
+   */
+  async containsText(selector: string, text: string) {
+    const element = this.page.locator(selector)
+    return await element.textContent().then(content => content?.includes(text))
+  }
+
+  /**
+   * 验证URL匹配
+   */
+  async urlMatches(pattern: RegExp | string) {
+    const url = this.page.url()
+    if (pattern instanceof RegExp) {
+      return pattern.test(url)
+    }
+    return url.includes(pattern)
+  }
+}
+
+/**
+ * 性能监控
+ */
+export class PerformanceMonitor {
+  private metrics: Map<string, number[]> = new Map()
+
+  /**
+   * 记录性能指标
+   */
+  recordMetric(name: string, value: number) {
+    if (!this.metrics.has(name)) {
+      this.metrics.set(name, [])
+    }
+    this.metrics.get(name)!.push(value)
+  }
+
+  /**
+   * 获取平均指标
+   */
+  getAverageMetric(name: string) {
+    const values = this.metrics.get(name)
+    if (!values || values.length === 0) {
+      return 0
+    }
+    return values.reduce((a, b) => a + b, 0) / values.length
+  }
+
+  /**
+   * 验证性能阈值
+   */
+  verifyThreshold(name: string, threshold: number) {
+    const avg = this.getAverageMetric(name)
+    return avg <= threshold
+  }
 }

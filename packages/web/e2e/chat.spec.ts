@@ -26,13 +26,13 @@ async function createTestSession(page: Page) {
   await page.waitForURL(/\/chat\/.*/, { timeout: 5000 })
 }
 
-describe('聊天功能 E2E 测试', () => {
+test.describe('聊天功能 E2E 测试', () => {
   test.beforeEach(async ({ page }) => {
     // 每个测试前登录
     await login(page)
   })
 
-  describe('发送和接收消息', () => {
+  test.describe('发送和接收消息', () => {
     test('用户应该能够发送消息并收到AI响应', async ({ page }) => {
       // 创建新会话
       await createTestSession(page)
@@ -114,7 +114,7 @@ describe('聊天功能 E2E 测试', () => {
     })
   })
 
-  describe('键盘快捷键', () => {
+  test.describe('键盘快捷键', () => {
     test('Ctrl+Enter应该发送消息', async ({ page }) => {
       await createTestSession(page)
 
@@ -167,7 +167,7 @@ describe('聊天功能 E2E 测试', () => {
     })
   })
 
-  describe('消息历史和滚动', () => {
+  test.describe('消息历史和滚动', () => {
     test('新消息应该自动滚动到底部', async ({ page }) => {
       await createTestSession(page)
 
@@ -227,7 +227,7 @@ describe('聊天功能 E2E 测试', () => {
     })
   })
 
-  describe('输入框功能', () => {
+  test.describe('输入框功能', () => {
     test('应该显示字符计数', async ({ page }) => {
       await createTestSession(page)
 
@@ -293,7 +293,7 @@ describe('聊天功能 E2E 测试', () => {
     })
   })
 
-  describe('Markdown和代码渲染', () => {
+  test.describe('Markdown和代码渲染', () => {
     test('应该渲染代码块', async ({ page }) => {
       await createTestSession(page)
 
@@ -350,7 +350,7 @@ describe('聊天功能 E2E 测试', () => {
     })
   })
 
-  describe('加载和错误状态', () => {
+  test.describe('加载和错误状态', () => {
     test('应该显示加载状态', async ({ page }) => {
       await createTestSession(page)
 
@@ -394,7 +394,7 @@ describe('聊天功能 E2E 测试', () => {
     })
   })
 
-  describe('深色模式', () => {
+  test.describe('深色模式', () => {
     test('应该能够切换深色模式', async ({ page }) => {
       await createTestSession(page)
 
@@ -412,7 +412,7 @@ describe('聊天功能 E2E 测试', () => {
     })
   })
 
-  describe('响应式设计', () => {
+  test.describe('响应式设计', () => {
     test('应该在移动端正确显示', async ({ page }) => {
       // 设置移动端视口
       await page.setViewportSize({ width: 375, height: 667 })
@@ -445,7 +445,7 @@ describe('聊天功能 E2E 测试', () => {
     })
   })
 
-  describe('可访问性', () => {
+  test.describe('可访问性', () => {
     test('输入框应该有正确的ARIA标签', async ({ page }) => {
       await createTestSession(page)
 
@@ -475,7 +475,7 @@ describe('聊天功能 E2E 测试', () => {
     })
   })
 
-  describe('性能', () => {
+  test.describe('性能', () => {
     test('页面加载时间应该在可接受范围内', async ({ page }) => {
       const startTime = Date.now()
 
@@ -512,7 +512,7 @@ describe('聊天功能 E2E 测试', () => {
     })
   })
 
-  describe('会话管理', () => {
+  test.describe('会话管理', () => {
     test('应该能够返回到会话列表', async ({ page }) => {
       await createTestSession(page)
 
@@ -534,7 +534,7 @@ describe('聊天功能 E2E 测试', () => {
     })
   })
 
-  describe('边界情况', () => {
+  test.describe('边界情况', () => {
     test('应该处理非常长的消息', async ({ page }) => {
       await createTestSession(page)
 
