@@ -1,8 +1,18 @@
 /**
- * AI Provider Service
+ * AI Provider Service Index
  *
- * Unified interface for multiple AI providers
+ * Exports AI provider functionality
  */
 
-export * from './ai-provider.types';
-export * from './ai-provider';
+export { AnthropicProvider, OpenAIProvider, GoogleProvider, createProvider } from './ai-provider';
+export type {
+  AIProvider,
+  AIProviderConfig,
+  ChatMessage,
+  CompletionOptions,
+  CompletionResponse,
+  StreamChunk,
+  ToolCall,
+  ToolDefinition,
+  Usage,
+} from './ai-provider.types';

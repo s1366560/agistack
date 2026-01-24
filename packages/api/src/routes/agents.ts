@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { AgentOrchestrator } from '../services/agents';
 import { AgentExecutionRepository } from '../repositories/agent-execution.repository';
 import { ToolRegistry } from '../tools/registry';
+import { createProvider } from '../services/ai';
 import type { AgentType, AgentState } from '@agistack/shared/types/agent';
 
 export const agentsRouter = new Hono();
@@ -24,8 +25,6 @@ let orchestratorInstance: AgentOrchestrator | null = null;
  */
 function getOrchestrator(): AgentOrchestrator {
   if (!orchestratorInstance) {
-    // Import AI provider dynamically to avoid circular dependencies
-    const { createProvider } = require('../services/ai/index');
     const aiProvider = createProvider({
       type: 'anthropic',
       apiKey: process.env.ANTHROPIC_API_KEY || '',
