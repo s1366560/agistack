@@ -127,6 +127,55 @@ function createTestTables(db: DrizzleD1Database<typeof schema>) {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Create agent_executions table
+  db.run(sql`
+    CREATE TABLE IF NOT EXISTS agent_executions (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      agent_type TEXT NOT NULL,
+      state TEXT NOT NULL DEFAULT 'idle',
+      input_prompt TEXT NOT NULL,
+      output_summary TEXT,
+      error_message TEXT,
+      steps TEXT,
+      tokens_used TEXT,
+      duration_ms TEXT,
+      started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      completed_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Create agent_tools table
+  db.run(sql`
+    CREATE TABLE IF NOT EXISTS agent_tools (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT NOT NULL,
+      category TEXT NOT NULL,
+      schema TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Create agent_tool_usage table
+  db.run(sql`
+    CREATE TABLE IF NOT EXISTS agent_tool_usage (
+      id TEXT PRIMARY KEY,
+      execution_id TEXT NOT NULL REFERENCES agent_executions(id) ON DELETE CASCADE,
+      tool_name TEXT NOT NULL,
+      arguments TEXT,
+      result TEXT,
+      duration_ms TEXT,
+      success INTEGER NOT NULL,
+      error_message TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
 }
 
 /**
@@ -148,6 +197,9 @@ function createUUIDFunction(db: DrizzleD1Database<typeof schema>) {
  */
 export async function cleanTestDatabase(db: DrizzleD1Database<typeof schema>) {
   // Delete in reverse order of dependencies
+  await db.delete(schema.agentToolUsage);
+  await db.delete(schema.agentExecutions);
+  await db.delete(schema.agentTools);
   await db.delete(schema.messages);
   await db.delete(schema.sessions);
   await db.delete(schema.projects);
