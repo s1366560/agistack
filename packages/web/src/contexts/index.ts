@@ -5,3 +5,5 @@
  */
 
 export * from './ProjectContext';
+export * from './AuthContext';
+export * from './AuthContext.types';
