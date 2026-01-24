@@ -147,6 +147,39 @@ sessionsRouter.put('/:id', zValidator('json', UpdateSessionSchema), async (c) =>
 });
 
 /**
+ * PATCH /api/sessions/:id
+ * Partially update a session (only provided fields)
+ */
+sessionsRouter.patch('/:id', zValidator('json', UpdateSessionSchema.partial()), async (c) => {
+  const id = c.req.param('id');
+  const data = c.req.valid('json');
+
+  // Only update fields that are provided
+  const updateData = Object.keys(data).reduce((acc, key) => {
+    if (data[key as keyof typeof data] !== undefined) {
+      acc[key as keyof typeof data] = data[key as keyof typeof data];
+    }
+    return acc;
+  }, {} as any);
+
+  const session = await sessionRepository.update(id, updateData);
+
+  if (!session) {
+    return c.json({
+      success: false,
+      error: 'Session not found',
+      timestamp: new Date().toISOString(),
+    }, 404);
+  }
+
+  return c.json({
+    success: true,
+    data: session,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+/**
  * DELETE /api/sessions/:id
  * Delete a session
  */

@@ -2,12 +2,14 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
-import { zValidator } from '@hono/zod-validator';
-import { z } from 'zod';
 import { healthCheckRouter } from './routes/health';
 import { sessionsRouter } from './routes/sessions';
 import { agentsRouter } from './routes/agents';
 import { toolsRoutes } from './routes/tools';
+import { projectsRouter } from './routes/projects';
+import { usersRouter } from './routes/users';
+import { workspacesRouter } from './routes/workspaces';
+import { authRouter } from './routes/auth';
 import { autoBootstrapTools } from './tools/bootstrap';
 
 const app = new Hono();
@@ -28,6 +30,18 @@ app.use('*', prettyJSON());
 // Health check routes
 app.route('/api/health', healthCheckRouter);
 
+// Auth routes (authentication)
+app.route('/api/auth', authRouter);
+
+// Users routes (user management)
+app.route('/api/users', usersRouter);
+
+// Workspaces routes (workspace CRUD)
+app.route('/api/workspaces', workspacesRouter);
+
+// Projects routes (project CRUD)
+app.route('/api/projects', projectsRouter);
+
 // Sessions routes (CRUD with database)
 app.route('/api/sessions', sessionsRouter);
 
@@ -36,40 +50,6 @@ app.route('/api/agents', agentsRouter);
 
 // Tools routes (tool management and execution)
 app.route('/api/tools', toolsRoutes);
-
-// Validation schemas
-const CreateProjectSchema = z.object({
-  workspaceId: z.string().min(1),
-  name: z.string().min(1),
-  path: z.string().min(1),
-  description: z.string().optional(),
-  metadata: z.record(z.string(), z.any()).optional(),
-});
-
-// In-memory storage (will be replaced with database)
-const projects: any[] = [];
-
-// Projects routes
-app.get('/api/projects', (c) => {
-  return c.json({
-    projects,
-  });
-});
-
-app.post('/api/projects', zValidator('json', CreateProjectSchema), async (c) => {
-  const data = c.req.valid('json');
-
-  const project = {
-    id: `proj-${Date.now()}`,
-    ...data,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  projects.push(project);
-
-  return c.json(project, 201);
-});
 
 // Root endpoint
 app.get('/', (c) => {

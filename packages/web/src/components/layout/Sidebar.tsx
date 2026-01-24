@@ -1,28 +1,11 @@
-import { Component, createSignal, For, Show } from 'solid-js';
+import { Component, createSignal, For, Show, onMount } from 'solid-js';
 import { A } from '@solidjs/router';
-
-export interface Workspace {
-  id: string;
-  name: string;
-}
-
-export interface Project {
-  id: string;
-  name: string;
-  workspaceId: string;
-}
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatarUrl?: string;
-}
+import { useProjectContext } from '../../contexts/ProjectContext';
+import { useWorkspaceContext } from '../../contexts/WorkspaceContext';
+import { useAuth } from '../../contexts/AuthContext';
+import type { Workspace, Project, User } from '@agistack/shared';
 
 export interface SidebarProps {
-  workspaces?: Workspace[];
-  projects?: Project[];
-  user?: User;
   currentPath?: string;
 }
 
@@ -47,16 +30,23 @@ export const testIds: SidebarTestIds = {
  *
  * Navigation sidebar with workspace, project lists, and user profile.
  * Supports collapsible behavior and responsive design.
+ * Fetches data from Context instead of props.
  */
 export const Sidebar: Component<SidebarProps> = (props) => {
   const [isCollapsed, setIsCollapsed] = createSignal(false);
+
+  const { projects } = useProjectContext();
+  const { workspaces, loadWorkspaces } = useWorkspaceContext();
+  const { user } = useAuth();
 
   const toggleCollapse = () => {
     setIsCollapsed(!isCollapsed());
   };
 
-  const workspaces = () => props.workspaces || [];
-  const projects = () => props.projects || [];
+  // Load workspaces on mount
+  onMount(async () => {
+    await loadWorkspaces();
+  });
 
   return (
     <aside
@@ -77,21 +67,30 @@ export const Sidebar: Component<SidebarProps> = (props) => {
         class={`workspace-list ${isCollapsed() ? 'hidden' : ''}`}
       >
         <h3>Workspaces</h3>
-        <ul>
-          <For each={workspaces()}>
-            {(workspace) => (
-              <li>
-                <A
-                  href={`/workspaces/${workspace.id}`}
-                  data-active={props.currentPath === `/workspaces/${workspace.id}`}
-                  data-testid={`workspace-${workspace.id}`}
-                >
-                  {workspace.name}
-                </A>
-              </li>
-            )}
-          </For>
-        </ul>
+        <Show
+          when={workspaces().length > 0}
+          fallback={
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              No workspaces yet
+            </p>
+          }
+        >
+          <ul>
+            <For each={workspaces()}>
+              {(workspace) => (
+                <li>
+                  <A
+                    href={`/workspaces/${workspace.id}`}
+                    data-active={props.currentPath === `/workspaces/${workspace.id}`}
+                    data-testid={`workspace-${workspace.id}`}
+                  >
+                    {workspace.name}
+                  </A>
+                </li>
+              )}
+            </For>
+          </ul>
+        </Show>
       </nav>
 
       <nav
@@ -99,31 +98,40 @@ export const Sidebar: Component<SidebarProps> = (props) => {
         class={`project-list ${isCollapsed() ? 'hidden' : ''}`}
       >
         <h3>Projects</h3>
-        <ul>
-          <For each={projects()}>
-            {(project) => (
-              <li>
-                <A
-                  href={`/projects/${project.id}`}
-                  data-active={props.currentPath === `/projects/${project.id}`}
-                  data-testid={`project-${project.id}`}
-                >
-                  {project.name}
-                </A>
-              </li>
-            )}
-          </For>
-        </ul>
+        <Show
+          when={projects().length > 0}
+          fallback={
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              No projects yet
+            </p>
+          }
+        >
+          <ul>
+            <For each={projects()}>
+              {(project) => (
+                <li>
+                  <A
+                    href={`/projects/${project.id}`}
+                    data-active={props.currentPath === `/projects/${project.id}`}
+                    data-testid={`project-${project.id}`}
+                  >
+                    {project.name}
+                  </A>
+                </li>
+              )}
+            </For>
+          </ul>
+        </Show>
       </nav>
 
-      <Show when={props.user}>
+      <Show when={user()}>
         <div data-testid={testIds.userProfile} class="user-profile">
-          <Show when={props.user?.avatarUrl}>
-            <img src={props.user?.avatarUrl} alt={`${props.user?.name} avatar`} />
+          <Show when={user()?.avatarUrl}>
+            <img src={user()?.avatarUrl} alt={`${user()?.name} avatar`} />
           </Show>
           <div class="user-info">
-            <div class="user-name">{props.user?.name}</div>
-            <div class="user-email">{props.user?.email}</div>
+            <div class="user-name">{user()?.name || user()?.email}</div>
+            <div class="user-email">{user()?.email}</div>
           </div>
         </div>
       </Show>

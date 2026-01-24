@@ -169,6 +169,44 @@ projectsRouter.put('/:id', zValidator('json', UpdateProjectSchema), async (c) =>
 });
 
 /**
+ * PATCH /api/projects/:id
+ * Partially update a project (only provided fields)
+ */
+projectsRouter.patch('/:id', zValidator('json', UpdateProjectSchema.partial()), async (c) => {
+  const { id } = c.req.param();
+  const data = c.req.valid('json');
+
+  try {
+    // Only update fields that are provided
+    const updateData = Object.keys(data).reduce((acc, key) => {
+      if (data[key as keyof typeof data] !== undefined) {
+        acc[key as keyof typeof data] = data[key as keyof typeof data];
+      }
+      return acc;
+    }, {} as any);
+
+    const project = await projectRepository.update(id, updateData);
+
+    if (!project) {
+      return c.json({
+        success: false,
+        error: 'Project not found',
+      }, 404);
+    }
+
+    return c.json({
+      success: true,
+      data: project,
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update project',
+    }, 400);
+  }
+});
+
+/**
  * DELETE /api/projects/:id
  * Delete a project
  */

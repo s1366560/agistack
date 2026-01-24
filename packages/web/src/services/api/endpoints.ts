@@ -19,6 +19,8 @@ import type {
   CreateSession,
   UpdateSession,
   SessionSummary,
+  Message,
+  CreateMessage,
 } from '@agistack/shared';
 
 /**
@@ -60,6 +62,32 @@ export class ApiEndpoints {
 
   async me(): Promise<ApiResponse<User>> {
     return this.client.get<User>('/api/auth/me');
+  }
+
+  async verifyToken(): Promise<ApiResponse<{ user: User; valid: boolean }>> {
+    return this.client.post<{ user: User; valid: boolean }>('/api/auth/verify');
+  }
+
+  /**
+   * User endpoints
+   */
+  async getCurrentUser(): Promise<ApiResponse<User>> {
+    return this.client.get<User>('/api/users/me');
+  }
+
+  async updateCurrentUser(data: Partial<Pick<User, 'name' | 'avatarUrl'>>): Promise<ApiResponse<User>> {
+    return this.client.patch<User>('/api/users/me', data);
+  }
+
+  async updatePassword(currentPassword: string, newPassword: string): Promise<ApiResponse<void>> {
+    return this.client.put<void>('/api/users/me/password', {
+      currentPassword,
+      newPassword,
+    });
+  }
+
+  async getUser(id: string): Promise<ApiResponse<User>> {
+    return this.client.get<User>(`/api/users/${id}`);
   }
 
   /**
@@ -130,6 +158,31 @@ export class ApiEndpoints {
 
   async deleteSession(id: string): Promise<ApiResponse<void>> {
     return this.client.delete<void>(`/api/sessions/${id}`);
+  }
+
+  /**
+   * Message endpoints
+   * Note: Messages are typically accessed through sessions,
+   * but we provide direct access for flexibility
+   */
+  async getMessages(sessionId: string): Promise<ApiResponse<Message[]>> {
+    return this.client.get<Message[]>(`/api/sessions/${sessionId}/messages`);
+  }
+
+  async getMessage(id: string): Promise<ApiResponse<Message>> {
+    return this.client.get<Message>(`/api/messages/${id}`);
+  }
+
+  async createMessage(sessionId: string, data: CreateMessage): Promise<ApiResponse<Message>> {
+    return this.client.post<Message>(`/api/sessions/${sessionId}/messages`, data);
+  }
+
+  async updateMessage(id: string, data: Partial<CreateMessage>): Promise<ApiResponse<Message>> {
+    return this.client.put<Message>(`/api/messages/${id}`, data);
+  }
+
+  async deleteMessage(id: string): Promise<ApiResponse<void>> {
+    return this.client.delete<void>(`/api/messages/${id}`);
   }
 }
 
