@@ -77,11 +77,15 @@ export function StreamingText(props: StreamingTextProps) {
 
   // 组件挂载时开始打字
   onMount(() => {
-    if (!props.complete) {
-      startTyping()
-    } else {
+    const speed = props.speed || 30
+
+    // 如果已完成或速度为0,立即显示完整文本
+    if (props.complete || speed === 0) {
       setDisplayText(props.text)
       setIsComplete(true)
+      props.onComplete?.()
+    } else if (!props.complete) {
+      startTyping()
     }
   })
 

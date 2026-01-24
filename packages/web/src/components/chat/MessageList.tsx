@@ -126,6 +126,8 @@ export function MessageList(props: MessageListProps) {
       return (
         <div
           data-testid="loading-indicator"
+          role="status"
+          aria-live="polite"
           class="flex items-center justify-center h-full"
         >
           <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>

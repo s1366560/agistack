@@ -120,6 +120,7 @@ export function PromptInput(props: PromptInputProps) {
         {/* 发送按钮 */}
         <div class="absolute right-2 bottom-2">
           <Button
+            data-testid="send-button"
             onClick={handleSubmit}
             disabled={isButtonDisabled()}
             aria-label="发送消息"
