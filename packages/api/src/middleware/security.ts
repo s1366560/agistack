@@ -13,7 +13,7 @@ const isTest = process.env.NODE_ENV === 'test';
 /**
  * Configure CORS for the application
  */
-function configureCORS() {
+export function configureCORS() {
   const allowedOrigins = isDevelopment
     ? ['http://localhost:3000', 'http://localhost:5173']
     : (process.env.ALLOWED_ORIGINS?.split(',') || []);
@@ -35,13 +35,15 @@ function configureCORS() {
     maxAge: isDevelopment ? 86400 : 3600,
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
+    // Add CORS headers to simple requests as well
+    exposeHeaders: ['Content-Type', 'Authorization'],
   });
 }
 
 /**
  * Configure security headers using Hono's secureHeaders
  */
-function configureSecurityHeaders(): MiddlewareHandler {
+export function configureSecurityHeaders(): MiddlewareHandler {
   // Use Hono's built-in secureHeaders middleware
   return secureHeaders({
     contentSecurityPolicy: isProduction
@@ -73,7 +75,7 @@ function configureSecurityHeaders(): MiddlewareHandler {
  */
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 
-function configureRateLimiting(): MiddlewareHandler {
+export function configureRateLimiting(): MiddlewareHandler {
   const WINDOW_MS = 60000; // 1 minute
   const MAX_REQUESTS = 100;
 
