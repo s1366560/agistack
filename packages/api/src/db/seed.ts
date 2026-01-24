@@ -66,3 +66,25 @@ export async function clearSeed() {
   await db.delete(users);
   console.log('Seed data cleared!');
 }
+
+/**
+ * CLI entrypoint
+ */
+async function main() {
+  const command = process.argv[2];
+
+  if (command === 'clear') {
+    await clearSeed();
+  } else {
+    // Default to seed
+    await seed();
+  }
+}
+
+// Run if called directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error) => {
+    console.error('Seed failed:', error);
+    process.exit(1);
+  });
+}
