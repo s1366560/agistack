@@ -1,0 +1,44 @@
+{
+  "name": "@agistack/api",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "start": "bun dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "bun src/db/migrate.ts",
+    "db:rollback": "bun src/db/migrate.ts rollback",
+    "db:seed": "bun src/db/seed.ts",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^1.0.0",
+    "@ai-sdk/google": "^1.0.0",
+    "@ai-sdk/openai": "^1.0.0",
+    "ai": "^4.0.0",
+    "cors": "^2.8.6",
+    "drizzle-orm": "^0.36.0",
+    "helmet": "^8.1.0",
+    "hono": "^4.11.5",
+    "postgres": "^3.4.0",
+    "zod": "^4.1.8"
+  },
+  "devDependencies": {
+    "@hono/zod-validator": "^0.4.3",
+    "@types/bcrypt": "^6.0.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "22.13.9",
+    "@vitest/coverage-v8": "3.0.7",
+    "@vitest/ui": "^4.0.18",
+    "bcrypt": "^6.0.0",
+    "better-sqlite3": "^12.6.2",
+    "bun-types": "latest",
+    "drizzle-kit": "^0.28.0",
+    "typescript": "5.8.2",
+    "vitest": "3.0.7"
+  }
+}
