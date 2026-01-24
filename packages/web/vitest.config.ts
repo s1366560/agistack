@@ -6,22 +6,37 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    setupFiles: ['./tests/setup.ts'],
-    include: ['tests/unit/**/*.test.tsx', 'src/**/*.test.tsx'],
-    exclude: ['tests/e2e/**', '**/*.e2e.ts', '**/*.spec.ts'],
+    setupFiles: [
+      './__tests__/setup/unit.ts',
+    ],
+    // Include both co-located tests and __tests__ directory
+    include: [
+      'src/**/*.test.{ts,tsx}',
+      '__tests__/unit/**/*.test.{ts,tsx}',
+      '__tests__/integration/**/*.test.{ts,tsx}',
+    ],
+    // Exclude E2E tests from unit test runs
+    exclude: [
+      'node_modules/',
+      'dist/',
+      '__tests__/e2e/**',
+      '**/*.e2e.test.{ts,tsx}',
+      '**/*.config.ts',
+      '**/*.config.js',
+      '**/types/**',
+      '**/*.stories.tsx',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
       exclude: [
         'node_modules/',
         'dist/',
-        'tests/',
-        'tests/e2e/**',
-        '**/*.test.ts',
-        '**/*.test.tsx',
-        '**/*.config.ts',
-        '**/*.config.js',
-        '**/types/',
+        '__tests__/',
+        '**/*.test.{ts,tsx}',
+        '**/*.spec.{ts,tsx}',
+        '**/*.config.{ts,js}',
+        '**/types/**',
         '**/*.stories.tsx',
       ],
       thresholds: {
@@ -31,6 +46,10 @@ export default defineConfig({
         statements: 80,
       },
     },
+    // Test timeout
+    testTimeout: 10000,
+    // Hook timeout
+    hookTimeout: 10000,
   },
   resolve: {
     alias: {

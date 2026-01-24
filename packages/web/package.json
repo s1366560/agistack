@@ -9,8 +9,13 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
+    "test:unit": "vitest run --config vitest.config.ts",
+    "test:integration": "vitest run --config vitest.config.ts --reporter=verbose __tests__/integration",
+    "test:watch": "vitest --watch",
     "test:coverage": "vitest --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:all": "npm run test:unit && npm run test:integration && npm run test:e2e"
   },
   "dependencies": {
     "@solidjs/router": "^0.15.4",

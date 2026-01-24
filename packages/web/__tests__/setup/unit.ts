@@ -1,3 +1,9 @@
+/**
+ * Unit Test Setup
+ *
+ * Global setup for unit tests
+ */
+
 import { vi } from 'vitest'
 import { Component, JSX } from 'solid-js'
 

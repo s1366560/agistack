@@ -1,0 +1,24 @@
+{
+  "name": "@agistack/shared",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    "./*": "./src/*.ts",
+    "./types/*": "./src/types/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage"
+  },
+  "dependencies": {
+    "zod": "4.1.8"
+  },
+  "devDependencies": {
+    "@types/node": "22.13.9",
+    "typescript": "5.8.2",
+    "vitest": "3.0.7",
+    "@vitest/coverage-v8": "3.0.7"
+  }
+}

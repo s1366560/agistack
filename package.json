@@ -1,0 +1,32 @@
+{
+  "name": "agistack",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.0",
+  "workspaces": {
+    "packages": [
+      "packages/*"
+    ]
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "clean": "rm -rf node_modules packages/*/node_modules",
+    "db:generate": "turbo run db:generate --filter='./packages/api'",
+    "db:migrate": "turbo run db:migrate --filter='./packages/api'",
+    "db:studio": "turbo run db:studio --filter='./packages/api'",
+    "test": "pnpm -r --filter './packages/*' run test",
+    "test:run": "pnpm -r --filter './packages/*' run test --run",
+    "test:coverage": "pnpm -r --filter './packages/*' run test:coverage"
+  },
+  "devDependencies": {
+    "@solidjs/testing-library": "^0.8.10",
+    "@types/node": "22.13.9",
+    "happy-dom": "^20.3.7",
+    "prettier": "3.6.2",
+    "turbo": "2.5.6",
+    "typescript": "5.8.2"
+  }
+}
