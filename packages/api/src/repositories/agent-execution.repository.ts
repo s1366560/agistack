@@ -129,4 +129,30 @@ export class AgentExecutionRepository extends BaseRepository<AgentExecution> {
       ) || null
     );
   }
+
+  /**
+   * Count executions with optional filters
+   */
+  async count(filters?: {
+    agentType?: 'build' | 'plan' | 'general';
+    state?: AgentState;
+    sessionId?: string;
+  }): Promise<number> {
+    // For now, return count from findAll
+    // In production, this should use a COUNT query
+    const executions = await this.findAll({
+      where: filters?.sessionId ? eq(agentExecutions.sessionId, filters.sessionId) : undefined,
+      orderBy: desc(agentExecutions.startedAt),
+    });
+
+    return executions.length;
+  }
+
+  /**
+   * Get steps for an execution
+   */
+  async getSteps(id: string): Promise<ExecutionStep[]> {
+    const execution = await this.findById(id);
+    return execution?.steps || [];
+  }
 }

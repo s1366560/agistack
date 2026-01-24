@@ -3,12 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@9.15.0",
-  "workspaces": {
-    "packages": [
-      "packages/*"
-    ]
-  },
+  "packageManager": "bun@1.2.1",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
@@ -17,9 +15,9 @@
     "db:generate": "turbo run db:generate --filter='./packages/api'",
     "db:migrate": "turbo run db:migrate --filter='./packages/api'",
     "db:studio": "turbo run db:studio --filter='./packages/api'",
-    "test": "pnpm -r --filter './packages/*' run test",
-    "test:run": "pnpm -r --filter './packages/*' run test --run",
-    "test:coverage": "pnpm -r --filter './packages/*' run test:coverage"
+    "test": "bun run test --filter './packages/*'",
+    "test:run": "bun run test --run --filter './packages/*'",
+    "test:coverage": "bun run test:coverage --filter './packages/*'"
   },
   "devDependencies": {
     "@solidjs/testing-library": "^0.8.10",

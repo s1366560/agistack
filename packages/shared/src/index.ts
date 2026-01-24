@@ -10,6 +10,7 @@ export * from './types/message';
 export * from './types/session';
 export * from './types/project';
 export * from './types/user';
+export * from './types/tool';
 
 // Note: Types are already exported via `export *` statements above
 // This re-export section is commented out to avoid duplication

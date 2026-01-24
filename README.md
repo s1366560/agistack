@@ -43,10 +43,60 @@ agistack/
 ### Prerequisites
 
 - [Bun](https://bun.sh/) 1.3.5 or later
-- PostgreSQL 14+ (local or remote)
-- Redis 7+ (optional, for caching)
+- [Docker](https://www.docker.com/) & Docker Compose (for local development services)
+- OR PostgreSQL 14+ and Redis 7+ (if not using Docker)
 
-### Installation
+### Option 1: Using Docker Compose (Recommended)
+
+1. Clone the repository:
+```bash
+git clone <repo-url>
+cd agistack
+```
+
+2. Install dependencies:
+```bash
+bun install
+```
+
+3. Start development dependencies with Docker Compose:
+```bash
+# Start PostgreSQL and Redis
+docker-compose up -d
+
+# Optional: Start with management tools (pgAdmin, Redis Commander)
+docker-compose --profile tools up -d
+```
+
+4. Set up environment variables:
+```bash
+cp .env.example .env
+# Edit .env with your configuration if needed
+```
+
+5. Initialize the database:
+```bash
+cd packages/api
+bun run db:generate
+bun run db:migrate
+bun run db:seed
+```
+
+6. Start development servers:
+```bash
+bun dev
+```
+
+7. Access the application:
+- Frontend: http://localhost:3000
+- API: http://localhost:3001
+- API Health: http://localhost:3001/api/health
+- pgAdmin (optional): http://localhost:5051
+- Redis Commander (optional): http://localhost:8082
+
+### Option 2: Using Native Services
+
+If you prefer to use native PostgreSQL and Redis installations:
 
 1. Clone the repository:
 ```bash
@@ -61,14 +111,16 @@ bun install
 
 3. Set up environment variables:
 ```bash
-cp packages/api/.env.example packages/api/.env
-# Edit packages/api/.env with your configuration
+cp .env.example .env
+# Edit .env with your configuration
 ```
 
 4. Initialize the database:
 ```bash
+cd packages/api
 bun run db:generate
 bun run db:migrate
+bun run db:seed
 ```
 
 5. Start development servers:
@@ -80,6 +132,58 @@ bun dev
 - Frontend: http://localhost:3000
 - API: http://localhost:3001
 - API Health: http://localhost:3001/api/health
+
+## Docker Compose Commands
+
+### Starting Services
+
+```bash
+# Start all core services (PostgreSQL, Redis)
+docker-compose up -d
+
+# Start with management tools (pgAdmin, Redis Commander)
+docker-compose --profile tools up -d
+
+# Stop all services
+docker-compose down
+
+# Stop and remove volumes (deletes data!)
+docker-compose down -v
+
+# View logs
+docker-compose logs -f
+
+# View specific service logs
+docker-compose logs -f postgres
+docker-compose logs -f redis
+```
+
+### Service URLs
+
+When using Docker Compose, services are available at:
+
+- **PostgreSQL**: localhost:5433
+- **Redis**: localhost:6380
+- **pgAdmin** (optional): http://localhost:5051
+  - Default credentials: admin@agistack.local / admin
+- **Redis Commander** (optional): http://localhost:8082
+
+### Quick Scripts
+
+Use the provided scripts for easier management:
+
+```bash
+# Start all services and run migrations
+./scripts/dev-start.sh
+
+# Stop all services
+./scripts/dev-stop.sh
+
+# Check status of all services
+./scripts/dev-status.sh
+```
+
+See [docs/DOCKER.md](./docs/DOCKER.md) for detailed Docker documentation.
 
 ## Development
 
@@ -184,7 +288,7 @@ bun run test:coverage
 
 ## Environment Variables
 
-See `packages/api/.env.example` for required environment variables:
+See `.env.example` in the root directory for all required environment variables:
 
 - `DATABASE_URL` - PostgreSQL connection string
 - `REDIS_URL` - Redis connection string (optional)

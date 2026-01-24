@@ -17,11 +17,11 @@ export const messageRepository = new MessageRepository();
 /**
  * Validation schemas
  */
+const agentTypeEnum = z.enum(['build', 'plan', 'general']);
+
 const CreateSessionSchema = z.object({
   projectId: z.string().min(1, 'Project ID is required'),
-  agentType: z.enum(['build', 'plan', 'general'], {
-    errorMap: () => ({ message: 'Agent type must be build, plan, or general' }),
-  }),
+  agentType: agentTypeEnum,
   title: z.string().optional(),
 });
 
@@ -32,7 +32,7 @@ const UpdateSessionSchema = z.object({
 
 const ListSessionsQuerySchema = z.object({
   projectId: z.string().optional(),
-  agentType: z.enum(['build', 'plan', 'general']).optional(),
+  agentType: agentTypeEnum.optional(),
   limit: z.string().optional().transform((val) => {
     if (val === undefined || val === null || val === '') return 50;
     const parsed = parseInt(val, 10);

@@ -6,8 +6,15 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { healthCheckRouter } from './routes/health';
 import { sessionsRouter } from './routes/sessions';
+import { agentsRouter } from './routes/agents';
+import { toolsRoutes } from './routes/tools';
+import { autoBootstrapTools } from './tools/bootstrap';
 
 const app = new Hono();
+
+// Bootstrap tools on startup
+autoBootstrapTools();
+console.log('Tools bootstrapped successfully');
 
 // Middleware
 app.use('*', cors({
@@ -23,6 +30,12 @@ app.route('/api/health', healthCheckRouter);
 
 // Sessions routes (CRUD with database)
 app.route('/api/sessions', sessionsRouter);
+
+// Agents routes (execution, tools, streaming)
+app.route('/api/agents', agentsRouter);
+
+// Tools routes (tool management and execution)
+app.route('/api/tools', toolsRoutes);
 
 // Validation schemas
 const CreateProjectSchema = z.object({
@@ -86,3 +99,12 @@ app.onError((err, c) => {
 });
 
 export const api = app;
+
+// Start server when run directly
+const port = parseInt(process.env.API_PORT || '3001');
+const server = Bun.serve({
+  fetch: app.fetch,
+  port,
+});
+
+console.log(`API server running on http://localhost:${port}`);

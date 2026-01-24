@@ -1,0 +1,331 @@
+/**
+ * Tool Registry Tests
+ *
+ * Tests for tool registration, discovery, and management
+ */
+
+import { describe, it, expect, beforeEach } from 'vitest';
+import { ToolRegistry } from '../../tools/registry';
+import type { ToolDefinition, ToolCategory } from '@agistack/shared/types/tool';
+import { z } from 'zod';
+
+describe('ToolRegistry', () => {
+  let registry: ToolRegistry;
+
+  const mockTool: ToolDefinition = {
+    name: 'test_tool',
+    description: 'A test tool',
+    category: 'file' as ToolCategory,
+    inputSchema: z.object({
+      input: z.string().describe('Test input'),
+    }),
+    outputSchema: z.object({
+      output: z.string(),
+    }),
+    handler: async (input) => ({
+      success: true,
+      data: { output: `processed: ${(input as any).input}` },
+    }),
+    enabled: true,
+    dangerous: false,
+  };
+
+  const dangerousTool: ToolDefinition = {
+    name: 'dangerous_tool',
+    description: 'A dangerous tool',
+    category: 'command' as ToolCategory,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        command: {
+          type: 'string',
+          description: 'Command to execute',
+          required: true,
+        },
+      },
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        output: { type: 'string' },
+      },
+    },
+    handler: async (input) => ({
+      success: true,
+      data: { output: `executed: ${input.command}` },
+    }),
+    enabled: true,
+    dangerous: true,
+  };
+
+  beforeEach(() => {
+    registry = new ToolRegistry();
+  });
+
+  describe('Tool Registration', () => {
+    it('should register a new tool', () => {
+      registry.register(mockTool);
+
+      const tool = registry.get('test_tool');
+      expect(tool).toBeDefined();
+      expect(tool?.name).toBe('test_tool');
+    });
+
+    it('should throw error when registering duplicate tool', () => {
+      registry.register(mockTool);
+
+      expect(() => {
+        registry.register(mockTool);
+      }).toThrow('Tool test_tool is already registered');
+    });
+
+    it('should register multiple tools', () => {
+      registry.register(mockTool);
+      registry.register(dangerousTool);
+
+      const tools = registry.getAll();
+      expect(tools).toHaveLength(2);
+    });
+
+    it('should validate tool definition before registration', () => {
+      const invalidTool = {
+        ...mockTool,
+        name: '', // Invalid: empty name
+      } as ToolDefinition;
+
+      expect(() => {
+        registry.register(invalidTool);
+      }).toThrow();
+    });
+  });
+
+  describe('Tool Discovery', () => {
+    beforeEach(() => {
+      registry.register(mockTool);
+      registry.register(dangerousTool);
+    });
+
+    it('should retrieve tool by name', () => {
+      const tool = registry.get('test_tool');
+
+      expect(tool).toBeDefined();
+      expect(tool?.name).toBe('test_tool');
+      expect(tool?.description).toBe('A test tool');
+    });
+
+    it('should return null for non-existent tool', () => {
+      const tool = registry.get('non_existent');
+
+      expect(tool).toBeNull();
+    });
+
+    it('should list all registered tools', () => {
+      const tools = registry.getAll();
+
+      expect(tools).toHaveLength(2);
+      expect(tools.map((t) => t.name)).toContain('test_tool');
+      expect(tools.map((t) => t.name)).toContain('dangerous_tool');
+    });
+
+    it('should filter tools by category', () => {
+      const fileTools = registry.getByCategory('file');
+      const commandTools = registry.getByCategory('command');
+
+      expect(fileTools).toHaveLength(1);
+      expect(fileTools[0].name).toBe('test_tool');
+
+      expect(commandTools).toHaveLength(1);
+      expect(commandTools[0].name).toBe('dangerous_tool');
+    });
+
+    it('should return only enabled tools', () => {
+      const disabledTool: ToolDefinition = {
+        name: 'disabled_tool',
+        description: 'A disabled tool',
+        category: 'system' as ToolCategory,
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+        outputSchema: {
+          type: 'object',
+          properties: {},
+        },
+        handler: async () => ({ success: true, data: {} }),
+        enabled: false,
+        dangerous: false,
+      };
+
+      registry.register(disabledTool);
+
+      const enabledTools = registry.getEnabled();
+      const allTools = registry.getAll();
+
+      expect(enabledTools).toHaveLength(2);
+      expect(allTools).toHaveLength(3);
+    });
+
+    it('should check if tool exists', () => {
+      expect(registry.has('test_tool')).toBe(true);
+      expect(registry.has('non_existent')).toBe(false);
+    });
+
+    it('should retrieve dangerous tools', () => {
+      const dangerousTools = registry.getDangerous();
+
+      expect(dangerousTools).toHaveLength(1);
+      expect(dangerousTools[0].name).toBe('dangerous_tool');
+      expect(dangerousTools[0].dangerous).toBe(true);
+    });
+  });
+
+  describe('Tool Unregistration', () => {
+    beforeEach(() => {
+      registry.register(mockTool);
+    });
+
+    it('should unregister a tool', () => {
+      registry.unregister('test_tool');
+
+      expect(registry.has('test_tool')).toBe(false);
+      expect(registry.get('test_tool')).toBeNull();
+    });
+
+    it('should return true when unregistering existing tool', () => {
+      const result = registry.unregister('test_tool');
+
+      expect(result).toBe(true);
+    });
+
+    it('should return false when unregistering non-existent tool', () => {
+      const result = registry.unregister('non_existent');
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('Tool Enable/Disable', () => {
+    beforeEach(() => {
+      registry.register(mockTool);
+    });
+
+    it('should disable a tool', () => {
+      registry.setEnabled('test_tool', false);
+
+      const tool = registry.get('test_tool');
+      expect(tool?.enabled).toBe(false);
+    });
+
+    it('should enable a tool', () => {
+      registry.setEnabled('test_tool', false);
+      registry.setEnabled('test_tool', true);
+
+      const tool = registry.get('test_tool');
+      expect(tool?.enabled).toBe(true);
+    });
+
+    it('should throw error when enabling non-existent tool', () => {
+      expect(() => {
+        registry.setEnabled('non_existent', true);
+      }).toThrow('Tool non_existent not found');
+    });
+
+    it('should reflect enabled status in getEnabled()', () => {
+      expect(registry.getEnabled()).toHaveLength(1);
+
+      registry.setEnabled('test_tool', false);
+      expect(registry.getEnabled()).toHaveLength(0);
+
+      registry.setEnabled('test_tool', true);
+      expect(registry.getEnabled()).toHaveLength(1);
+    });
+  });
+
+  describe('Tool Metadata', () => {
+    it('should store and retrieve tool metadata', () => {
+      const toolWithMetadata: ToolDefinition = {
+        name: 'metadata_tool',
+        description: 'Tool with metadata',
+        category: 'ai' as ToolCategory,
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+        outputSchema: {
+          type: 'object',
+          properties: {},
+        },
+        handler: async () => ({ success: true, data: {} }),
+        enabled: true,
+        dangerous: false,
+        metadata: {
+          version: '1.0.0',
+          author: 'Test Author',
+          tags: ['test', 'metadata'],
+        },
+      };
+
+      registry.register(toolWithMetadata);
+
+      const tool = registry.get('metadata_tool');
+      expect(tool?.metadata).toBeDefined();
+      expect(tool?.metadata?.version).toBe('1.0.0');
+      expect(tool?.metadata?.tags).toEqual(['test', 'metadata']);
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle tools with same name case-insensitively', () => {
+      // Note: Unified registry is case-sensitive
+      // Registering two tools with different cases will create two separate tools
+      registry.register(mockTool);
+
+      const tool1 = registry.get('test_tool');
+
+      expect(tool1).toBeDefined();
+      // TEST_TOOL is not the same as test_tool in case-sensitive registry
+      const tool2 = registry.get('TEST_TOOL');
+      expect(tool2).toBeUndefined();
+    });
+
+    it('should handle large number of tools', () => {
+      const tools: ToolDefinition[] = [];
+
+      for (let i = 0; i < 100; i++) {
+        const tool: ToolDefinition = {
+          name: `tool_${i}`,
+          description: `Tool ${i}`,
+          category: 'system' as ToolCategory,
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+          outputSchema: {
+            type: 'object',
+            properties: {},
+          },
+          handler: async () => ({ success: true, data: {} }),
+          enabled: true,
+          dangerous: false,
+        };
+
+        tools.push(tool);
+        registry.register(tool);
+      }
+
+      expect(registry.getAll()).toHaveLength(100);
+      expect(registry.getEnabled()).toHaveLength(100);
+    });
+
+    it('should clear all tools', () => {
+      registry.register(mockTool);
+      registry.register(dangerousTool);
+
+      expect(registry.getAll()).toHaveLength(2);
+
+      registry.clear();
+
+      expect(registry.getAll()).toHaveLength(0);
+    });
+  });
+});

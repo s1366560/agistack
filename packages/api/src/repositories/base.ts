@@ -68,7 +68,7 @@ export abstract class BaseRepository<T extends { id: string }> {
       const [entity] = await this.db
         .select()
         .from(this.table)
-        .where(eq(this.table.id as any, id))
+        .where(eq((this.table as any).id, id))
         .limit(1);
 
       return (entity as T) || null;
@@ -141,21 +141,29 @@ export abstract class BaseRepository<T extends { id: string }> {
    * Count all entities
    */
   async count(...conditions: SQL[]): Promise<number> {
-    if (conditions.length === 0) {
+    try {
+      if (conditions.length === 0) {
+        const result = await this.db
+          .select({ count: (this.table as any).id })
+          .from(this.table);
+        return result.length;
+      }
+
+      const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
+
       const result = await this.db
-        .select({ count: this.table.id as any })
-        .from(this.table);
+        .select({ count: (this.table as any).id })
+        .from(this.table)
+        .where(whereClause as any);
+
       return result.length;
+    } catch {
+      // Fallback to using findAll if table.id is not available
+      if (conditions.length === 0) {
+        return (await this.findAll()).length;
+      }
+      return (await this.findMany(...conditions)).length;
     }
-
-    const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
-
-    const result = await this.db
-      .select({ count: this.table.id as any })
-      .from(this.table)
-      .where(whereClause as any);
-
-    return result.length;
   }
 
   /**
@@ -177,7 +185,7 @@ export abstract class BaseRepository<T extends { id: string }> {
       const [entity] = await this.db
         .update(this.table)
         .set({ ...data, updatedAt: new Date() } as any)
-        .where(eq(this.table.id as any, id))
+        .where(eq((this.table as any).id, id))
         .returning();
 
       return (entity as T) || null;
@@ -198,7 +206,7 @@ export abstract class BaseRepository<T extends { id: string }> {
       .set({ ...data, updatedAt: new Date() } as any)
       .where(where);
 
-    return result.rowCount || 0;
+    return (result as any).rowCount || 0;
   }
 
   /**
@@ -208,9 +216,9 @@ export abstract class BaseRepository<T extends { id: string }> {
     try {
       const result = await this.db
         .delete(this.table)
-        .where(eq(this.table.id as any, id));
+        .where(eq((this.table as any).id, id));
 
-      return (result.rowCount || 0) > 0;
+      return ((result as any).rowCount || 0) > 0;
     } catch {
       return false;
     }
@@ -221,16 +229,16 @@ export abstract class BaseRepository<T extends { id: string }> {
    */
   async deleteMany(where: SQL): Promise<number> {
     const result = await this.db.delete(this.table).where(where);
-    return result.rowCount || 0;
+    return (result as any).rowCount || 0;
   }
 
   /**
    * Execute operations in a transaction
    */
   async transaction<R>(
-    callback: (tx: typeof db) => Promise<R>
+    callback: (tx: any) => Promise<R>
   ): Promise<R> {
-    return this.db.transaction(callback);
+    return this.db.transaction(callback as any);
   }
 
   /**

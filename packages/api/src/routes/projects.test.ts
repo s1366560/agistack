@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ProjectRepository } from '../repositories/project.repository';
 import { projectsRouter } from './projects';
-import { getTestDatabase } from '../../tests/setup';
+import { getTestDatabase } from '../tests/setup';
 import { users, workspaces, projects } from '../db/schema';
 import { eq } from 'drizzle-orm';
 

@@ -21,15 +21,15 @@ export function configureCORS() {
   return cors({
     origin: (origin) => {
       // Allow requests with no origin (mobile apps, curl, etc.)
-      if (!origin) return true;
+      if (!origin) return undefined;
 
       // In development, allow localhost
       if (isDevelopment) {
-        return allowedOrigins.includes(origin);
+        return allowedOrigins.includes(origin) ? origin : null;
       }
 
       // In production, only allow configured origins
-      return allowedOrigins.includes(origin);
+      return allowedOrigins.includes(origin) ? origin : null;
     },
     credentials: true,
     maxAge: isDevelopment ? 86400 : 3600,
@@ -58,12 +58,6 @@ export function configureSecurityHeaders(): MiddlewareHandler {
     crossOriginEmbedderPolicy: isProduction,
     crossOriginOpenerPolicy: isProduction,
     crossOriginResourcePolicy: isProduction,
-    hsts: isProduction ? {
-      maxAge: 31536000,
-      includeSubDomains: true,
-      preload: true,
-    } : undefined,
-    noSniff: true,
     referrerPolicy: isProduction ? 'no-referrer' : 'unsafe-url',
     originAgentCluster: isProduction,
   });

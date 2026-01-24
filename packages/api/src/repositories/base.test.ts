@@ -23,13 +23,15 @@ describe('BaseRepository (Structure)', () => {
   });
 
   it('should export PaginationOptions interface', async () => {
-    const { PaginationOptions } = await import('./base');
+    const module = await import('./base');
+    type PaginationOptions = module.PaginationOptions;
     const options: PaginationOptions = { limit: 10, offset: 0 };
     expect(options.limit).toBe(10);
   });
 
   it('should export PaginatedResult interface', async () => {
-    const { PaginatedResult } = await import('./base');
+    const module = await import('./base');
+    type PaginatedResult<T> = module.PaginatedResult<T>;
 
     type TestEntity = { id: string; name: string };
     const result: PaginatedResult<TestEntity> = {

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { MessageRepository } from './message.repository';
 import { sessions, messages, projects, workspaces, users } from '../db/schema';
-import { getTestDatabase } from '../../tests/setup';
+import { getTestDatabase } from '../tests/setup';
 import { eq } from 'drizzle-orm';
 import type { MessageRole, AgentType } from '../db/schema';
 

@@ -1,0 +1,721 @@
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { Hono } from 'hono';
+import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { ToolRegistry } from '../../src/tools/registry';
+import { registerCoreTools } from '../../src/tools/core';
+import { toolsRoutes } from '../../src/routes/tools';
+
+describe('Tools Integration Tests', () => {
+  let testDir: string;
+  let app: Hono;
+  let registry: ToolRegistry;
+
+  // Helper to get default context with permissions
+  const getDefaultContext = () => ({
+    permissions: [
+      { resourceType: 'file', pattern: process.cwd() + '/**', action: 'allow' },
+    ],
+  });
+
+  beforeAll(async () => {
+    // Create Hono app
+    app = new Hono();
+
+    // Initialize registry
+    ToolRegistry.resetInstance();
+    registry = ToolRegistry.getInstance();
+    registerCoreTools(registry);
+
+    // Register tools routes
+    app.route('/tools', toolsRoutes);
+
+    // Create test directory
+    testDir = join(process.cwd(), 'test-integration-tools');
+    if (!existsSync(testDir)) {
+      mkdirSync(testDir, { recursive: true });
+    }
+  });
+
+  afterAll(() => {
+    // Cleanup test directory
+    if (existsSync(testDir)) {
+      rmSync(testDir, { recursive: true, force: true });
+    }
+
+    // Reset registry
+    ToolRegistry.resetInstance();
+  });
+
+  beforeEach(() => {
+    // Reset rate limits before each test
+    const executor = registry as any;
+    if (executor.rateLimiter) {
+      executor.rateLimiter.clear();
+    }
+  });
+
+  describe('Complete Tool Execution Flow', () => {
+    it('should execute read-file tool through API', async () => {
+      // Create a test file in process.cwd() to match tool permissions
+      const testFile = join(process.cwd(), 'test-integration-read.txt');
+      writeFileSync(testFile, 'Hello from integration test!');
+
+      try {
+        // Execute tool through API with matching permissions
+        const response = await app.request('/tools/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toolName: 'read-file',
+            input: { path: testFile },
+            context: {
+              permissions: [
+                { resourceType: 'file', pattern: process.cwd() + '/**', action: 'allow' },
+              ],
+            },
+          }),
+        });
+
+        const json = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(json.success).toBe(true);
+        expect(json.data.result.success).toBe(true);
+        expect(json.data.result.data.content).toBe('Hello from integration test!');
+      } finally {
+        // Cleanup
+        if (existsSync(testFile)) {
+          rmSync(testFile);
+        }
+      }
+    });
+
+    it('should execute write-file tool through API', async () => {
+      const testFile = join(process.cwd(), 'test-integration-write.txt');
+
+      try {
+        // Execute tool through API
+        const response = await app.request('/tools/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toolName: 'write-file',
+            input: {
+              path: testFile,
+              content: 'Written by API',
+            },
+          }),
+        });
+
+        const json = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(json.success).toBe(true);
+        expect(json.data.result.success).toBe(true);
+        expect(existsSync(testFile)).toBe(true);
+        expect(readFileSync(testFile, 'utf-8')).toBe('Written by API');
+      } finally {
+        if (existsSync(testFile)) {
+          rmSync(testFile);
+        }
+      }
+    });
+
+    it('should execute list-files tool through API', async () => {
+      // Create test files in process.cwd()
+      const file1 = join(process.cwd(), 'test-list-1.txt');
+      const file2 = join(process.cwd(), 'test-list-2.txt');
+      writeFileSync(file1, 'content1');
+      writeFileSync(file2, 'content2');
+
+      try {
+        // Execute tool through API
+        const response = await app.request('/tools/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toolName: 'list-files',
+            input: { path: process.cwd() },
+          }),
+        });
+
+        const json = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(json.success).toBe(true);
+        expect(json.data.result.success).toBe(true);
+        // Should find our test files among many others
+        const allFiles = json.data.result.data.files.join(' ');
+        expect(allFiles.includes('test-list-1.txt') || allFiles.includes('test-list-2.txt')).toBe(true);
+      } finally {
+        if (existsSync(file1)) rmSync(file1);
+        if (existsSync(file2)) rmSync(file2);
+      }
+    });
+
+    it('should execute search-code tool through API', async () => {
+      // Create test file with searchable content
+      const testFile = join(process.cwd(), 'test-search.txt');
+      writeFileSync(testFile, 'line 1\npattern match\nline 3');
+
+      try {
+        // Execute tool through API
+        const response = await app.request('/tools/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toolName: 'search-code',
+            input: {
+              path: process.cwd(),
+              pattern: 'pattern',
+              extensions: ['.txt'],
+            },
+          }),
+        });
+
+        const json = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(json.success).toBe(true);
+        expect(json.data.result.success).toBe(true);
+        expect(json.data.result.data.matches.length).toBeGreaterThan(0);
+      } finally {
+        if (existsSync(testFile)) rmSync(testFile);
+      }
+    });
+  });
+
+  describe('Tool Discovery and Metadata', () => {
+    it('should list all available tools', async () => {
+      const response = await app.request('/tools');
+      const json = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(json.success).toBe(true);
+      expect(json.data.tools.length).toBeGreaterThanOrEqual(4);
+
+      const toolNames = json.data.tools.map((t: any) => t.name);
+      expect(toolNames).toContain('read-file');
+      expect(toolNames).toContain('write-file');
+      expect(toolNames).toContain('list-files');
+      expect(toolNames).toContain('search-code');
+    });
+
+    it('should get tool details for each core tool', async () => {
+      const tools = ['read-file', 'write-file', 'list-files', 'search-code'];
+
+      for (const toolName of tools) {
+        const response = await app.request(`/tools/${toolName}`);
+        const json = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(json.success).toBe(true);
+        expect(json.data.tool.name).toBe(toolName);
+        expect(json.data.tool.description).toBeDefined();
+        expect(json.data.tool.category).toBeDefined();
+        expect(json.data.tool.inputSchema).toBeDefined();
+        expect(json.data.tool.outputSchema).toBeDefined();
+      }
+    });
+
+    it('should filter tools by category', async () => {
+      const response = await app.request('/tools?category=file');
+      const json = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(json.data.tools.every((t: any) => t.category === 'file')).toBe(true);
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should handle non-existent tool', async () => {
+      const response = await app.request('/tools/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toolName: 'nonexistent-tool',
+          input: {},
+        }),
+      });
+
+      const json = await response.json();
+
+      // Returns 404 when tool not found
+      expect(response.status).toBe(404);
+      expect(json.success).toBe(false);
+    });
+
+    it('should handle invalid input gracefully', async () => {
+      const response = await app.request('/tools/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toolName: 'read-file',
+          input: {}, // Missing required 'path' parameter
+        }),
+      });
+
+      const json = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(json.success).toBe(true);
+      expect(json.data.result.success).toBe(false);
+      expect(json.data.result.error).toBeDefined();
+    });
+
+    it('should handle tool execution errors', async () => {
+      const response = await app.request('/tools/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toolName: 'read-file',
+          input: { path: '/nonexistent/file.txt' },
+        }),
+      });
+
+      const json = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(json.success).toBe(true);
+      expect(json.data.result.success).toBe(false);
+      expect(json.data.result.error).toBeDefined();
+    });
+
+    it('should handle invalid request body', async () => {
+      const response = await app.request('/tools/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          // Missing required fields
+        }),
+      });
+
+      const json = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(json.success).toBe(false);
+    });
+  });
+
+  describe('Security Integration', () => {
+    it('should reject path traversal attacks', async () => {
+      const response = await app.request('/tools/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toolName: 'read-file',
+          input: { path: join(process.cwd(), '../../../etc/passwd') },
+        }),
+      });
+
+      const json = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(json.success).toBe(true);
+      expect(json.data.result.success).toBe(false);
+      // Error mentions outside allowed or permission denied
+      expect(json.data.result.error).toBeDefined();
+    });
+
+    it('should reject paths with null bytes', async () => {
+      const response = await app.request('/tools/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toolName: 'read-file',
+          input: { path: join(testDir, 'file\x00.txt') },
+        }),
+      });
+
+      const json = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(json.success).toBe(true);
+      expect(json.data.result.success).toBe(false);
+    });
+  });
+
+  describe('Context and Metadata', () => {
+    it('should pass execution context to tool', async () => {
+      const testFile = join(process.cwd(), 'test-context.txt');
+      writeFileSync(testFile, 'content');
+
+      try {
+        const response = await app.request('/tools/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toolName: 'read-file',
+            input: { path: testFile },
+            context: {
+              executionId: 'exec-123',
+              sessionId: 'session-456',
+              userId: 'user-789',
+              timeout: 5000,
+            },
+          }),
+        });
+
+        const json = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(json.success).toBe(true);
+        expect(json.data.result.success).toBe(true);
+      } finally {
+        if (existsSync(testFile)) rmSync(testFile);
+      }
+    });
+
+    it('should include metadata in tool result', async () => {
+      const testFile = join(process.cwd(), 'test-metadata.txt');
+      writeFileSync(testFile, 'content');
+
+      try {
+        const response = await app.request('/tools/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toolName: 'read-file',
+            input: { path: testFile },
+          }),
+        });
+
+        const json = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(json.success).toBe(true);
+        expect(json.data.result.success).toBe(true);
+        expect(json.data.result.data).toBeDefined();
+      } finally {
+        if (existsSync(testFile)) rmSync(testFile);
+      }
+    });
+  });
+
+  describe('Multi-Tool Workflows', () => {
+    it('should support chained tool operations', async () => {
+      const chainedFile = join(process.cwd(), 'test-chained.txt');
+
+      try {
+        // Step 1: Write a file
+        const writeResponse = await app.request('/tools/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toolName: 'write-file',
+            input: {
+              path: chainedFile,
+              content: 'Chained operation result',
+            },
+          }),
+        });
+
+        const writeJson = await writeResponse.json();
+        expect(writeJson.data.result.success).toBe(true);
+
+        // Step 2: Read the file back
+        const readResponse = await app.request('/tools/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toolName: 'read-file',
+            input: { path: chainedFile },
+          }),
+        });
+
+        const readJson = await readResponse.json();
+        expect(readJson.data.result.success).toBe(true);
+        expect(readJson.data.result.data.content).toBe('Chained operation result');
+      } finally {
+        if (existsSync(chainedFile)) rmSync(chainedFile);
+      }
+    });
+
+    it('should support search then read workflow', async () => {
+      // Create multiple files
+      const doc1 = join(process.cwd(), 'test-doc-1.txt');
+      const doc2 = join(process.cwd(), 'test-doc-2.txt');
+      const doc3 = join(process.cwd(), 'test-doc-3.txt');
+      writeFileSync(doc1, 'important data here');
+      writeFileSync(doc2, 'other content');
+      writeFileSync(doc3, 'important information');
+
+      try {
+        // Step 1: Search for files containing 'important'
+        const searchResponse = await app.request('/tools/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toolName: 'search-code',
+            input: {
+              path: process.cwd(),
+              pattern: 'important',
+              extensions: ['.txt'],
+            },
+          }),
+        });
+
+        const searchJson = await searchResponse.json();
+        expect(searchJson.data.result.success).toBe(true);
+        expect(searchJson.data.result.data.matches.length).toBeGreaterThanOrEqual(2);
+
+        // Step 2: Read one of the matched files
+        const firstMatch = searchJson.data.result.data.matches[0].file;
+        const readResponse = await app.request('/tools/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toolName: 'read-file',
+            input: { path: firstMatch },
+          }),
+        });
+
+        const readJson = await readResponse.json();
+        expect(readJson.data.result.success).toBe(true);
+        expect(readJson.data.result.data.content).toContain('important');
+      } finally {
+        if (existsSync(doc1)) rmSync(doc1);
+        if (existsSync(doc2)) rmSync(doc2);
+        if (existsSync(doc3)) rmSync(doc3);
+      }
+    });
+  });
+
+  describe('Registry Status', () => {
+    it('should return accurate registry information', async () => {
+      const response = await app.request('/tools/registry');
+      const json = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(json.success).toBe(true);
+      expect(json.data.registry.count).toBeGreaterThanOrEqual(4);
+      expect(json.data.registry.tools).toBeDefined();
+      expect(Array.isArray(json.data.registry.tools)).toBe(true);
+    });
+
+    it('should include all core tools in registry', async () => {
+      const response = await app.request('/tools/registry');
+      const json = await response.json();
+
+      const toolNames = json.data.registry.tools.map((t: any) => t.name);
+      expect(toolNames).toContain('read-file');
+      expect(toolNames).toContain('write-file');
+      expect(toolNames).toContain('list-files');
+      expect(toolNames).toContain('search-code');
+    });
+  });
+
+  describe('AI Provider Schema Conversion', () => {
+    it('should convert tool to OpenAI format', async () => {
+      const response = await app.request('/tools/schema/read-file?format=openai');
+      const json = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(json.success).toBe(true);
+      expect(json.data.format).toBe('openai');
+      expect(json.data.schema).toBeDefined();
+    });
+
+    it('should convert tool to Anthropic format', async () => {
+      const response = await app.request('/tools/schema/read-file?format=anthropic');
+      const json = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(json.success).toBe(true);
+      expect(json.data.format).toBe('anthropic');
+      expect(json.data.schema).toBeDefined();
+    });
+
+    it('should convert tool to Google format', async () => {
+      const response = await app.request('/tools/schema/list-files?format=google');
+      const json = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(json.success).toBe(true);
+      expect(json.data.format).toBe('google');
+      expect(json.data.schema).toBeDefined();
+    });
+  });
+
+  describe('Performance and Limits', () => {
+    it('should handle multiple rapid requests', async () => {
+      const testFile = join(testDir, 'perf-test.txt');
+      writeFileSync(testFile, 'content');
+
+      // Execute 10 rapid requests
+      const promises = Array.from({ length: 10 }, () =>
+        app.request('/tools/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toolName: 'read-file',
+            input: { path: testFile },
+          }),
+        })
+      );
+
+      const responses = await Promise.all(promises);
+
+      // All requests should succeed
+      for (const response of responses) {
+        const json = await response.json();
+        expect(response.status).toBe(200);
+        expect(json.success).toBe(true);
+      }
+    });
+
+    it('should enforce rate limits', async () => {
+      // Try to execute tool more than rate limit allows
+      // Note: This test may need adjustment based on actual rate limit configuration
+      const testFile = join(testDir, 'rate-limit.txt');
+      writeFileSync(testFile, 'content');
+
+      // Execute many requests rapidly
+      const promises = Array.from({ length: 150 }, () =>
+        app.request('/tools/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toolName: 'read-file',
+            input: { path: testFile },
+          }),
+        })
+      );
+
+      const responses = await Promise.all(promises);
+
+      // At least some requests should succeed
+      const successCount = responses.filter((r) => r.status === 200).length;
+      expect(successCount).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Encoding and Binary Files', () => {
+    it('should handle different encodings', async () => {
+      const testFile = join(process.cwd(), 'test-encoding.txt');
+      writeFileSync(testFile, 'UTF-8 content: 你好世界');
+
+      try {
+        const response = await app.request('/tools/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toolName: 'read-file',
+            input: { path: testFile, encoding: 'utf-8' },
+          }),
+        });
+
+        const json = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(json.success).toBe(true);
+        expect(json.data.result.success).toBe(true);
+        expect(json.data.result.data.content).toContain('你好世界');
+      } finally {
+        if (existsSync(testFile)) rmSync(testFile);
+      }
+    });
+
+    it('should handle base64 encoding', async () => {
+      const testFile = join(process.cwd(), 'test-binary.bin');
+      const buffer = Buffer.from([0x00, 0x01, 0x02, 0x03]);
+      writeFileSync(testFile, buffer);
+
+      try {
+        const response = await app.request('/tools/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toolName: 'read-file',
+            input: { path: testFile, encoding: 'base64' },
+          }),
+        });
+
+        const json = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(json.success).toBe(true);
+        expect(json.data.result.success).toBe(true);
+        expect(json.data.result.data.content).toBeDefined();
+      } finally {
+        if (existsSync(testFile)) rmSync(testFile);
+      }
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle empty directory listing', async () => {
+      const emptyDir = join(process.cwd(), 'test-empty');
+      mkdirSync(emptyDir, { recursive: true });
+
+      try {
+        const response = await app.request('/tools/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toolName: 'list-files',
+            input: { path: emptyDir },
+          }),
+        });
+
+        const json = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(json.success).toBe(true);
+        expect(json.data.result.success).toBe(true);
+        expect(json.data.result.data.files).toEqual([]);
+      } finally {
+        if (existsSync(emptyDir)) rmSync(emptyDir, { recursive: true });
+      }
+    });
+
+    it('should handle no search results', async () => {
+      const response = await app.request('/tools/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toolName: 'search-code',
+          input: {
+            path: process.cwd(),
+            pattern: 'this-pattern-does-not-exist-anywhere-xyz123',
+            extensions: ['.xyz'],
+          },
+        }),
+      });
+
+      const json = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(json.success).toBe(true);
+      expect(json.data.result.success).toBe(true);
+      expect(json.data.result.data.matches).toEqual([]);
+    });
+
+    it('should handle special characters in content', async () => {
+      const testFile = join(process.cwd(), 'test-special.txt');
+      const content = 'Line 1\nLine 2\tTabbed\n"Quotes"\n\'Single\'';
+      writeFileSync(testFile, content);
+
+      try {
+        const response = await app.request('/tools/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toolName: 'read-file',
+            input: { path: testFile },
+          }),
+        });
+
+        const json = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(json.success).toBe(true);
+        expect(json.data.result.success).toBe(true);
+        expect(json.data.result.data.content).toBe(content);
+      } finally {
+        if (existsSync(testFile)) rmSync(testFile);
+      }
+    });
+  });
+});

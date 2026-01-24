@@ -1,0 +1,313 @@
+/**
+ * Tool Types Tests
+ *
+ * Tests for tool interface and type definitions
+ */
+
+import { describe, it, expect } from 'vitest';
+import {
+  ToolDefinition,
+  ToolInputSchema,
+  ToolOutputSchema,
+  ToolExecutionContext,
+  ToolExecutionResult,
+  ToolCategory,
+} from './tool.types';
+
+describe('Tool Types', () => {
+  describe('ToolDefinition', () => {
+    it('should define a valid tool structure', () => {
+      const tool: ToolDefinition = {
+        name: 'read_file',
+        description: 'Read contents of a file',
+        category: 'file' as ToolCategory,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            path: {
+              type: 'string',
+              description: 'File path to read',
+              required: true,
+            },
+          },
+        },
+        outputSchema: {
+          type: 'object',
+          properties: {
+            content: {
+              type: 'string',
+              description: 'File contents',
+            },
+          },
+        },
+        handler: async () => ({
+          success: true,
+          data: { content: 'test' },
+        }),
+        enabled: true,
+        dangerous: false,
+      };
+
+      expect(tool.name).toBe('read_file');
+      expect(tool.category).toBe('file');
+      expect(tool.enabled).toBe(true);
+      expect(tool.dangerous).toBe(false);
+    });
+
+    it('should support dangerous flag for security-sensitive tools', () => {
+      const dangerousTool: ToolDefinition = {
+        name: 'execute_command',
+        description: 'Execute shell command',
+        category: 'command' as ToolCategory,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            command: {
+              type: 'string',
+              description: 'Command to execute',
+              required: true,
+            },
+          },
+        },
+        outputSchema: {
+          type: 'object',
+          properties: {
+            output: { type: 'string' },
+          },
+        },
+        handler: async () => ({
+          success: true,
+          data: { output: '' },
+        }),
+        enabled: true,
+        dangerous: true,
+      };
+
+      expect(dangerousTool.dangerous).toBe(true);
+    });
+
+    it('should support optional metadata', () => {
+      const toolWithMetadata: ToolDefinition = {
+        name: 'search_code',
+        description: 'Search codebase',
+        category: 'search' as ToolCategory,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: 'Search query',
+              required: true,
+            },
+          },
+        },
+        outputSchema: {
+          type: 'object',
+          properties: {
+            results: {
+              type: 'array',
+              description: 'Search results',
+            },
+          },
+        },
+        handler: async () => ({
+          success: true,
+          data: { results: [] },
+        }),
+        enabled: true,
+        dangerous: false,
+        metadata: {
+          version: '1.0.0',
+          author: 'Agistack',
+          tags: ['code', 'search'],
+        },
+      };
+
+      expect(toolWithMetadata.metadata).toBeDefined();
+      expect(toolWithMetadata.metadata?.version).toBe('1.0.0');
+      expect(toolWithMetadata.metadata?.tags).toContain('code');
+    });
+  });
+
+  describe('ToolExecutionContext', () => {
+    it('should provide execution context with user info', () => {
+      const context: ToolExecutionContext = {
+        userId: 'user-123',
+        sessionId: 'session-456',
+        executionId: 'execution-789',
+        workspaceId: 'workspace-abc',
+        permissions: {
+          canReadFiles: true,
+          canWriteFiles: false,
+          canExecuteCommands: false,
+        },
+      };
+
+      expect(context.userId).toBe('user-123');
+      expect(context.sessionId).toBe('session-456');
+      expect(context.permissions.canReadFiles).toBe(true);
+      expect(context.permissions.canWriteFiles).toBe(false);
+    });
+
+    it('should support timeout configuration', () => {
+      const context: ToolExecutionContext = {
+        userId: 'user-123',
+        sessionId: 'session-456',
+        executionId: 'execution-789',
+        workspaceId: 'workspace-abc',
+        permissions: {
+          canReadFiles: true,
+          canWriteFiles: true,
+          canExecuteCommands: true,
+        },
+        timeout: 30000,
+      };
+
+      expect(context.timeout).toBe(30000);
+    });
+  });
+
+  describe('ToolExecutionResult', () => {
+    it('should represent successful execution', () => {
+      const result: ToolExecutionResult = {
+        success: true,
+        data: {
+          content: 'file contents',
+          size: 1024,
+        },
+        durationMs: 150,
+      };
+
+      expect(result.success).toBe(true);
+      expect(result.data.content).toBe('file contents');
+      expect(result.durationMs).toBe(150);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('should represent failed execution', () => {
+      const result: ToolExecutionResult = {
+        success: false,
+        error: 'File not found',
+        durationMs: 50,
+      };
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('File not found');
+      expect(result.data).toBeUndefined();
+    });
+
+    it('should support metadata in results', () => {
+      const result: ToolExecutionResult = {
+        success: true,
+        data: {
+          count: 5,
+        },
+        metadata: {
+          cached: true,
+          source: 'redis',
+        },
+        durationMs: 10,
+      };
+
+      expect(result.metadata?.cached).toBe(true);
+      expect(result.metadata?.source).toBe('redis');
+    });
+  });
+
+  describe('ToolInputSchema', () => {
+    it('should define required and optional properties', () => {
+      const schema: ToolInputSchema = {
+        type: 'object',
+        properties: {
+          required: {
+            type: 'string',
+            description: 'Required field',
+            required: true,
+          },
+          optional: {
+            type: 'string',
+            description: 'Optional field',
+            required: false,
+          },
+          withDefault: {
+            type: 'number',
+            description: 'Field with default',
+            required: false,
+            default: 100,
+          },
+        },
+      };
+
+      expect(schema.properties.required.required).toBe(true);
+      expect(schema.properties.optional.required).toBe(false);
+      expect(schema.properties.withDefault.default).toBe(100);
+    });
+
+    it('should support complex types', () => {
+      const schema: ToolInputSchema = {
+        type: 'object',
+        properties: {
+          array: {
+            type: 'array',
+            description: 'List of items',
+            required: false,
+            itemType: 'string',
+          },
+          object: {
+            type: 'object',
+            description: 'Nested object',
+            required: false,
+            properties: {
+              nested: {
+                type: 'string',
+                required: true,
+              },
+            },
+          },
+        },
+      };
+
+      expect(schema.properties.array.type).toBe('array');
+      expect(schema.properties.array.itemType).toBe('string');
+      expect(schema.properties.object.type).toBe('object');
+    });
+  });
+
+  describe('ToolOutputSchema', () => {
+    it('should define output structure', () => {
+      const schema: ToolOutputSchema = {
+        type: 'object',
+        properties: {
+          status: {
+            type: 'string',
+            description: 'Operation status',
+          },
+          result: {
+            type: 'any',
+            description: 'Operation result',
+          },
+        },
+      };
+
+      expect(schema.properties.status.type).toBe('string');
+      expect(schema.properties.result.type).toBe('any');
+    });
+  });
+
+  describe('ToolCategory', () => {
+    it('should support all defined categories', () => {
+      const categories: ToolCategory[] = [
+        'file',
+        'code',
+        'command',
+        'search',
+        'ai',
+        'system',
+      ];
+
+      expect(categories).toHaveLength(6);
+      expect(categories).toContain('file');
+      expect(categories).toContain('ai');
+    });
+  });
+});

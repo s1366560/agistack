@@ -73,7 +73,7 @@ describe('Security Middleware', () => {
       const response = await app.request('/test');
 
       expect(response.status).toBe(200);
-      const data = await response.json();
+      const data = await response.json() as { message: string };
       expect(data.message).toBe('test');
     });
 
@@ -83,7 +83,7 @@ describe('Security Middleware', () => {
       });
 
       expect(response.status).toBe(200);
-      const data = await response.json();
+      const data = await response.json() as { created: boolean };
       expect(data.created).toBe(true);
     });
 

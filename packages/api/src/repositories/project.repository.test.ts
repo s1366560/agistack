@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { ProjectRepository } from './project.repository';
 import { projects, users, workspaces } from '../db/schema';
-import { getTestDatabase } from '../../tests/setup';
+import { getTestDatabase } from '../tests/setup';
 
 describe('ProjectRepository', () => {
   let repository: ProjectRepository;

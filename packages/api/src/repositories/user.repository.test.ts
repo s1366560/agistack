@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { UserRepository } from './user.repository';
 import { users, workspaces } from '../db/schema';
-import { getTestDatabase } from '../../tests/setup';
+import { getTestDatabase } from '../tests/setup';
 
 describe('UserRepository', () => {
   let repository: UserRepository;

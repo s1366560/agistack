@@ -14,7 +14,6 @@ import {
   useContext,
   JSX,
   createSignal,
-  onMount,
 } from 'solid-js'
 import type { User } from '@agistack/shared'
 import type {
@@ -85,20 +84,7 @@ export function AuthProvider(props: AuthProviderProps): JSX.Element {
   const [isAuthenticated, setIsAuthenticated] = createSignal<boolean>(false)
   const [user, setUser] = createSignal<User | null>(null)
   const [token, setToken] = createSignal<string | null>(null)
-  const [loading, setLoading] = createSignal<boolean>(true)
-
-  /**
-   * Initialize auth state from localStorage on mount
-   */
-  onMount(() => {
-    const storedToken = getInitialToken(storageKey)
-    if (storedToken) {
-      setToken(storedToken)
-      checkAuth()
-    } else {
-      setLoading(false)
-    }
-  })
+  const [loading, setLoading] = createSignal<boolean>(false)
 
   /**
    * Check authentication status by calling /auth/me endpoint
