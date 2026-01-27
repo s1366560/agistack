@@ -1,0 +1,39 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2026-01-27",
+  "baseline": {
+    "concurrentConnections": {
+      "target": 100,
+      "acceptableLatencyMs": 100,
+      "maxMemoryMB": 512,
+      "description": "Handle 100 concurrent WebSocket connections"
+    },
+    "connectionStability": {
+      "cycles": 1000,
+      "targetSuccessRate": 0.99,
+      "description": "1000 connect/disconnect cycles with 99% success rate"
+    },
+    "messageThroughput": {
+      "target": 1000,
+      "messagesPerSecond": 1000,
+      "maxLatencyMs": 50,
+      "description": "Handle 1000 messages per second"
+    },
+    "streamingLatency": {
+      "targetLatencyMs": 100,
+      "chunkIntervalMs": 50,
+      "maxJitterMs": 20,
+      "description": "Streaming responses with low latency"
+    },
+    "longTermStability": {
+      "durationMinutes": 5,
+      "maxMemoryGrowthMB": 100,
+      "maxErrorRate": 0.01,
+      "description": "5 minute stability test with minimal memory growth"
+    }
+  },
+  "thresholds": {
+    "warning": 1.1,
+    "critical": 1.25
+  }
+}

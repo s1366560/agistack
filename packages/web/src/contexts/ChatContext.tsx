@@ -11,9 +11,11 @@ import {
   JSX,
   createSignal,
   batch,
+  onCleanup,
 } from 'solid-js'
 import type { Session, Message, MessageChunk } from '@agistack/shared'
 import type { ChatApi } from '../services/api/chat-api'
+import type { WebSocketClient } from '../services/sync/websocket'
 import type {
   ChatContextValue,
   ChatProviderProps,
@@ -44,6 +46,9 @@ export function ChatProvider(props: ChatProviderProps): JSX.Element {
   const [streaming, setStreaming] = createSignal(false)
   const [streamText, setStreamText] = createSignal('')
 
+  // WebSocket client (optional)
+  const wsClient = props.wsClient
+
   // Internal state for retry functionality
   const internalState: ChatInternalState = {
     lastSessionId: null,
@@ -51,11 +56,24 @@ export function ChatProvider(props: ChatProviderProps): JSX.Element {
     lastOperation: null,
   }
 
+  // Cleanup on unmount
+  onCleanup(() => {
+    // Unsubscribe from session if using WebSocket
+    if (wsClient && internalState.lastSessionId) {
+      try {
+        wsClient.unsubscribeFromSession(internalState.lastSessionId)
+      } catch (error) {
+        // Ignore cleanup errors
+      }
+    }
+  })
+
   /**
    * Load a session by ID
    *
    * Fetches both the session and its messages from the API.
    * Updates state atomically using batch to prevent unnecessary re-renders.
+   * If WebSocket client is available, subscribes to the session for real-time updates.
    */
   const loadSession = async (id: string): Promise<void> => {
     // Store for retry
@@ -69,14 +87,11 @@ export function ChatProvider(props: ChatProviderProps): JSX.Element {
     })
 
     try {
-      // Fetch session and messages in parallel
-      const [sessionResult, messagesResult] = await Promise.all([
-        props.api.getSession(id),
-        props.api.getMessages(id),
-      ])
+      // Fetch session with messages in a single call
+      const result = await props.api.getSessionWithMessages(id)
 
       // Check if session exists
-      if (!sessionResult) {
+      if (!result) {
         batch(() => {
           setSession(null)
           setMessages([])
@@ -84,6 +99,29 @@ export function ChatProvider(props: ChatProviderProps): JSX.Element {
           setLoading(false)
         })
         return
+      }
+
+      const { session: sessionResult, messages: messagesResult } = result
+
+      // Unsubscribe from previous session if using WebSocket
+      const previousSessionId = session()?.id
+      if (wsClient && previousSessionId && previousSessionId !== id) {
+        try {
+          wsClient.unsubscribeFromSession(previousSessionId)
+        } catch (error) {
+          // Ignore unsubscribe errors
+          console.warn('Failed to unsubscribe from previous session:', error)
+        }
+      }
+
+      // Subscribe to new session if using WebSocket and connected
+      if (wsClient && wsClient.isConnected()) {
+        try {
+          wsClient.subscribeToSession(id)
+        } catch (error) {
+          // Log but don't fail - continue with API polling as fallback
+          console.warn('Failed to subscribe to session via WebSocket:', error)
+        }
       }
 
       // Update state with results
@@ -94,6 +132,7 @@ export function ChatProvider(props: ChatProviderProps): JSX.Element {
       })
     } catch (err) {
       // Handle errors
+      console.error('[ChatContext] Error in loadSession:', err)
       const errorMessage = err instanceof Error ? err.message : 'Unknown error'
       batch(() => {
         setSession(null)
@@ -107,27 +146,61 @@ export function ChatProvider(props: ChatProviderProps): JSX.Element {
   /**
    * Send a message to the current session
    *
-   * Adds the user message immediately, then streams the assistant's response.
+   * Adds the user message immediately, then streams the assistant's response via WebSocket.
+   * Requires WebSocket client to be connected.
    */
   const sendMessage = async (content: string): Promise<void> => {
+    console.log('[ChatContext] sendMessage called with content:', content);
+
     // Validate content
     const trimmedContent = trimContent(content)
+    console.log('[ChatContext] Trimmed content:', trimmedContent);
+
     if (!trimmedContent) {
+      console.log('[ChatContext] Empty content, returning');
       return
     }
 
     // Check if session is loaded
     const currentSession = session()
+    console.log('[ChatContext] Current session:', currentSession);
+
     if (!currentSession) {
+      console.error('[ChatContext] No session loaded');
       setError('No session loaded')
       return
     }
 
     // Check if already loading
     if (loading()) {
+      console.error('[ChatContext] Already loading');
       setError('Cannot send message while loading')
       return
     }
+
+    // Check if WebSocket is available
+    console.log('[ChatContext] wsClient:', wsClient);
+
+    if (!wsClient) {
+      console.error('[ChatContext] WebSocket client not available');
+      setError('WebSocket client not available. Please refresh the page.')
+      return
+    }
+
+    // Check if WebSocket is connected
+    const isConnected = wsClient.isConnected()
+    console.log('[ChatContext] WebSocket connected:', isConnected);
+
+    if (!isConnected) {
+      console.error('[ChatContext] WebSocket disconnected');
+      setError('WebSocket disconnected. Reconnecting...')
+      // Try to reconnect
+      wsClient.connect()
+      // Note: In production, you might want to wait for reconnection
+      return
+    }
+
+    console.log('[ChatContext] All checks passed, proceeding to send message');
 
     // Store for retry
     internalState.lastMessageContent = trimmedContent
@@ -151,33 +224,83 @@ export function ChatProvider(props: ChatProviderProps): JSX.Element {
     })
 
     try {
-      // Stream the response
-      let accumulatedText = ''
+      // Send message via WebSocket
+      wsClient.sendChatMessage(currentSession.id, trimmedContent)
 
-      for await (const chunk of props.api.streamMessage(currentSession.id, trimmedContent)) {
-        if (chunk.delta) {
-          accumulatedText += chunk.delta
-          setStreamText(accumulatedText)
-        }
+      // Set up listeners for streaming chunks
+      const chunkHandler = (data: any) => {
+        if (data.sessionId === currentSession.id) {
+          if (data.type === 'chunk') {
+            const currentText = streamText()
 
-        if (chunk.done) {
-          break
+            if (data.content) {
+              setStreamText(currentText + data.content)
+            }
+          } else if (data.type === 'done') {
+            // Streaming complete - add assistant message
+            const finalText = streamText()
+            const assistantMessage: Message = {
+              role: 'assistant',
+              content: finalText,
+              createdAt: new Date(),
+            }
+
+            batch(() => {
+              setMessages((prev) => [...prev, assistantMessage])
+              setStreaming(false)
+              setStreamText('')
+            })
+
+            // Clean up listeners
+            wsClient.off('chunk', chunkHandler)
+            wsClient.off('done', doneHandler)
+            wsClient.off('error', errorHandler)
+          }
         }
       }
 
-      // Create assistant message with accumulated text
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: accumulatedText,
-        createdAt: new Date(),
+      const doneHandler = (data: any) => {
+        if (data.sessionId === currentSession.id && data.type === 'done') {
+          // Handle done message
+          const finalText = streamText()
+          const assistantMessage: Message = {
+            role: 'assistant',
+            content: finalText,
+            createdAt: new Date(),
+          }
+
+          batch(() => {
+            setMessages((prev) => [...prev, assistantMessage])
+            setStreaming(false)
+            setStreamText('')
+          })
+
+          // Clean up listeners
+          wsClient.off('chunk', chunkHandler)
+          wsClient.off('done', doneHandler)
+          wsClient.off('error', errorHandler)
+        }
       }
 
-      // Add assistant message and clear streaming state
-      batch(() => {
-        setMessages((prev) => [...prev, assistantMessage])
-        setStreaming(false)
-        setStreamText('')
-      })
+      const errorHandler = (error: any) => {
+        // Check if error is for this session
+        const errorMessage = error?.message || 'Stream failed'
+        batch(() => {
+          setError(errorMessage)
+          setStreaming(false)
+          setStreamText('')
+        })
+
+        // Clean up listeners
+        wsClient.off('chunk', chunkHandler)
+        wsClient.off('done', doneHandler)
+        wsClient.off('error', errorHandler)
+      }
+
+      // Register listeners
+      wsClient.on('chunk', chunkHandler)
+      wsClient.on('done', doneHandler)
+      wsClient.on('error', errorHandler)
     } catch (err) {
       // Handle streaming errors
       const errorMessage = err instanceof Error ? err.message : 'Stream failed'

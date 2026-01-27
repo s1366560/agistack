@@ -11,6 +11,7 @@ import { AgentOrchestrator } from '../services/agents';
 import { AgentExecutionRepository } from '../repositories/agent-execution.repository';
 import { ToolRegistry } from '../tools/registry';
 import { createProvider } from '../services/ai';
+import { getSessionAIConfig } from '../config/ai.config';
 import type { AgentType, AgentState } from '@agistack/shared/types/agent';
 
 export const agentsRouter = new Hono();
@@ -21,15 +22,12 @@ export const toolRegistry = new ToolRegistry();
 let orchestratorInstance: AgentOrchestrator | null = null;
 
 /**
- * Get or create orchestrator instance
+ * Get or create orchestrator instance with configuration from environment
  */
-function getOrchestrator(): AgentOrchestrator {
+function getOrchestrator(agentType?: 'build' | 'plan' | 'general'): AgentOrchestrator {
   if (!orchestratorInstance) {
-    const aiProvider = createProvider({
-      type: 'anthropic',
-      apiKey: process.env.ANTHROPIC_API_KEY || '',
-      model: 'claude-3-5-sonnet-20241022',
-    });
+    const config = getSessionAIConfig(agentType || 'general');
+    const aiProvider = createProvider(config);
     orchestratorInstance = new AgentOrchestrator(aiProvider, toolRegistry);
   }
   return orchestratorInstance;
@@ -132,7 +130,7 @@ const ListToolsQuerySchema = z.object({
 agentsRouter.post('/execute', zValidator('json', ExecuteAgentSchema), async (c) => {
   try {
     const { agentType, messages, config, options } = c.req.valid('json');
-    const orchestrator = getOrchestrator();
+    const orchestrator = getOrchestrator(agentType);
 
     // Create execution record
     const execution = await agentExecutionRepository.create({
@@ -177,7 +175,7 @@ agentsRouter.post('/execute', zValidator('json', ExecuteAgentSchema), async (c) 
  */
 agentsRouter.get('/stream', zValidator('query', StreamAgentSchema), async (c) => {
   const { agentType, message, config } = c.req.valid('query');
-  const orchestrator = getOrchestrator();
+  const orchestrator = getOrchestrator(agentType);
 
   // Create execution record
   const execution = await agentExecutionRepository.create({

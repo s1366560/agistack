@@ -40,7 +40,13 @@ export type WebSocketMessageType =
   | 'authenticated'
   | 'sub'
   | 'unsub'
-  | 'error';
+  | 'subscribed'
+  | 'unsubscribed'
+  | 'chat'
+  | 'subscribe'
+  | 'unsubscribe'
+  | 'error'
+  | 'connected';
 
 /**
  * WebSocket message interface
@@ -204,7 +210,18 @@ export class WebSocketClient extends EventEmitter {
         return;
       }
 
-      // Handle subscriptions
+      // Handle subscription confirmations (new protocol)
+      if (message.type === 'subscribed') {
+        this.emit('subscribed', message);
+        return;
+      }
+
+      if (message.type === 'unsubscribed') {
+        this.emit('unsubscribed', message);
+        return;
+      }
+
+      // Handle subscriptions (old protocol - for backward compatibility)
       if (message.type === 'sub' || message.type === 'unsub') {
         this.emit('subscription', message);
         return;
@@ -219,6 +236,12 @@ export class WebSocketClient extends EventEmitter {
       // Handle tool calls
       if (message.type === 'tool_call') {
         this.emit('tool_call', message);
+        return;
+      }
+
+      // Handle done message
+      if (message.type === 'done') {
+        this.emit('done', message);
         return;
       }
 
@@ -409,5 +432,65 @@ export class WebSocketClient extends EventEmitter {
       this.listeners.clear();
       this.removeAllListeners();
     }, 0);
+  }
+
+  /**
+   * Send a chat message to a session
+   *
+   * @param sessionId - The session ID to send the message to
+   * @param content - The message content
+   * @throws {Error} If WebSocket is not connected
+   */
+  sendChatMessage(sessionId: string, content: string): void {
+    this.send({
+      type: 'chat',
+      sessionId,
+      content,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Subscribe to a session for real-time updates
+   *
+   * @param sessionId - The session ID to subscribe to
+   * @throws {Error} If WebSocket is not connected
+   */
+  subscribeToSession(sessionId: string): void {
+    // Track subscription
+    this.subscriptions.add(sessionId);
+
+    // Send subscription message to server
+    this.send({
+      type: 'subscribe',
+      sessionId,
+    });
+  }
+
+  /**
+   * Unsubscribe from a session
+   *
+   * @param sessionId - The session ID to unsubscribe from
+   * @throws {Error} If WebSocket is not connected
+   */
+  unsubscribeFromSession(sessionId: string): void {
+    // Remove from local tracking
+    this.subscriptions.delete(sessionId);
+
+    // Send unsubscribe message to server
+    this.send({
+      type: 'unsubscribe',
+      sessionId,
+    });
+  }
+
+  /**
+   * Check if subscribed to a specific session
+   *
+   * @param sessionId - The session ID to check
+   * @returns True if subscribed to the session
+   */
+  isSubscribedToSession(sessionId: string): boolean {
+    return this.subscriptions.has(sessionId);
   }
 }

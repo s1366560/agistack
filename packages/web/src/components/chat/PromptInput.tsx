@@ -49,8 +49,8 @@ export function PromptInput(props: PromptInputProps) {
 
   // 处理键盘事件
   const handleKeyDown = (e: KeyboardEvent) => {
-    // Ctrl+Enter 或 Cmd+Enter 提交
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    // Enter 提交（Shift+Enter 换行）
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSubmit()
     }

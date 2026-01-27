@@ -265,3 +265,12 @@ export class ApiClient {
 export function createApiClient(config: ApiClientConfig): ApiClient {
   return new ApiClient(config);
 }
+
+/**
+ * Default API client instance
+ */
+export const apiClient = createApiClient({
+  baseURL: '/api',
+  timeout: 10000,
+  retries: 3,
+});

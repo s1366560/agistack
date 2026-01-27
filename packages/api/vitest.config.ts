@@ -9,6 +9,7 @@ export default defineConfig({
     include: [
       'src/**/*.test.ts',  // Co-located unit tests
       '__tests__/integration/**/*.test.ts',  // Integration tests
+      '__tests__/performance/**/*.test.ts',  // Performance tests
     ],
     // Exclude E2E tests from unit test runs
     exclude: [

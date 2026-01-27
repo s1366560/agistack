@@ -10,6 +10,7 @@ import { useParams, useNavigate } from '@solidjs/router'
 import { useChatContext } from '../../contexts/ChatContext'
 import { useAppContext } from '../../contexts/AppContext'
 import { ChatPage } from '../../components/chat/ChatPage'
+import { ChatErrorBoundary } from '../../components/chat/ChatErrorBoundary'
 
 /**
  * Chat 路由容器组件
@@ -51,12 +52,13 @@ export default function ChatRouteContainer() {
 
   // 处理深色模式切换
   const handleDarkModeToggle = () => {
-    appContext.toggleDarkMode()
+    appContext.toggleTheme()
   }
 
-  // 处理设置关闭
+  // 处理设置关闭（暂时未实现）
   const handleSettingsClose = () => {
-    appContext.setSettingsOpen(false)
+    // TODO: 实现设置功能
+    console.log('Settings not yet implemented')
   }
 
   // 处理搜索打开
@@ -142,42 +144,50 @@ export default function ChatRouteContainer() {
   }
 
   return (
-    <Show
-      when={chatContext.loading()}
-      fallback={renderLoading()}
+    <ChatErrorBoundary
+      onError={(error) => {
+        console.error('Chat route error:', error);
+      }}
     >
       <Show
-        when={chatContext.error()}
+        when={chatContext.loading()}
         fallback={
           <Show
-            when={chatContext.session()}
-            fallback={renderNotFound()}
+            when={chatContext.error()}
+            fallback={
+              <Show
+                when={chatContext.session()}
+                fallback={renderNotFound()}
+                >
+                <ChatPage
+                  session={chatContext.session()!}
+                  messages={chatContext.messages()}
+                  loading={chatContext.loading()}
+                  error={chatContext.error() || undefined}
+                  streaming={chatContext.streaming()}
+                  streamText={chatContext.streamText()}
+                  onSendMessage={chatContext.sendMessage}
+                  onBack={handleBack}
+                  onRetry={chatContext.retry}
+                  onSettingsClose={handleSettingsClose}
+                  onSearchOpen={handleSearchOpen}
+                  onDarkModeToggle={handleDarkModeToggle}
+                  darkMode={appContext.theme() === 'dark'}
+                  showSessionMetadata={true}
+                  enableVirtualization={false}
+                  placeholder="输入消息... (Ctrl+Enter 发送)"
+                  settingsOpen={false}
+                />
+              </Show>
+            }
           >
-            <ChatPage
-              session={chatContext.session()!}
-              messages={chatContext.messages()}
-              loading={chatContext.loading()}
-              error={chatContext.error() || undefined}
-              streaming={chatContext.streaming()}
-              streamText={chatContext.streamText()}
-              onSendMessage={chatContext.sendMessage}
-              onBack={handleBack}
-              onRetry={chatContext.retry}
-              onSettingsClose={handleSettingsClose}
-              onSearchOpen={handleSearchOpen}
-              onDarkModeToggle={handleDarkModeToggle}
-              darkMode={appContext.darkMode()}
-              showSessionMetadata={true}
-              enableVirtualization={false}
-              placeholder="输入消息... (Ctrl+Enter 发送)"
-              settingsOpen={appContext.settingsOpen()}
-            />
+            {renderError()}
           </Show>
         }
       >
-        {renderError()}
+        {renderLoading()}
       </Show>
-    </Show>
+    </ChatErrorBoundary>
   )
 }
 

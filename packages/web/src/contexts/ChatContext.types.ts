@@ -8,6 +8,7 @@
 import type { Accessor, JSX } from 'solid-js'
 import type { Session, Message, MessageChunk } from '@agistack/shared'
 import type { ChatApi } from '../services/api/chat-api'
+import type { WebSocketClient } from '../services/sync/websocket'
 
 /**
  * Chat context state interface (using SolidJS Accessor/signals)
@@ -50,6 +51,8 @@ export interface ChatContextValue extends ChatState, ChatActions {}
 export interface ChatProviderProps {
   /** Chat API instance */
   api: ChatApi
+  /** Optional WebSocket client for real-time communication */
+  wsClient?: WebSocketClient
   /** Child components */
   children: JSX.Element
 }

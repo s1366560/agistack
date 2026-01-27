@@ -6,7 +6,7 @@ import { MessageRepository } from '../repositories/message.repository';
 
 /**
  * Sessions router
- * Handles CRUD operations for sessions
+ * Handles CRUD operations for sessions and messages
  */
 export const sessionsRouter = new Hono();
 
@@ -208,6 +208,70 @@ sessionsRouter.delete('/:id', async (c) => {
     },
     timestamp: new Date().toISOString(),
   });
+});
+
+/**
+ * GET /api/sessions/:id/messages
+ * Get all messages for a session
+ */
+sessionsRouter.get('/:id/messages', async (c) => {
+  const id = c.req.param('id');
+
+  // Verify session exists
+  const session = await sessionRepository.findById(id);
+  if (!session) {
+    return c.json({
+      success: false,
+      error: 'Session not found',
+      timestamp: new Date().toISOString(),
+    }, 404);
+  }
+
+  const messages = await messageRepository.findBySessionId(id);
+
+  return c.json({
+    success: true,
+    data: messages,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+/**
+ * POST /api/sessions/:id/messages
+ * Create a new message in a session
+ *
+ * Note: For real-time AI responses, use WebSocket instead.
+ * This endpoint only creates the message in the database.
+ */
+const CreateMessageSchema = z.object({
+  role: z.enum(['user', 'assistant', 'system']),
+  content: z.string().min(1, 'Content is required'),
+});
+
+sessionsRouter.post('/:id/messages', zValidator('json', CreateMessageSchema), async (c) => {
+  const id = c.req.param('id');
+  const data = c.req.valid('json');
+
+  // Verify session exists
+  const session = await sessionRepository.findById(id);
+  if (!session) {
+    return c.json({
+      success: false,
+      error: 'Session not found',
+      timestamp: new Date().toISOString(),
+    }, 404);
+  }
+
+  const message = await messageRepository.create({
+    sessionId: id,
+    ...data,
+  });
+
+  return c.json({
+    success: true,
+    data: message,
+    timestamp: new Date().toISOString(),
+  }, 201);
 });
 
 /**

@@ -6,9 +6,9 @@
  * Supports streaming responses, tool calling, and automatic retries
  */
 
-import { anthropic } from '@ai-sdk/anthropic';
-import { openai } from '@ai-sdk/openai';
-import { google } from '@ai-sdk/google';
+import { createAnthropic } from '@ai-sdk/anthropic';
+import { createOpenAI } from '@ai-sdk/openai';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import {
   streamText,
   generateText,
@@ -231,9 +231,36 @@ export class AnthropicProvider implements AIProvider {
     this.validateConfig(config);
     this.config = config;
 
-    this.modelInstance = anthropic(config.model, {
+    const createOptions: any = {
       apiKey: config.apiKey,
-    });
+    };
+
+    // Add baseURL if configured
+    if (config.baseURL) {
+      console.log('[AnthropicProvider] Using custom baseURL:', config.baseURL);
+      createOptions.baseURL = config.baseURL;
+
+      // For 智谱AI (bigmodel), override fetch to use Authorization header
+      if (config.baseURL.includes('bigmodel')) {
+        console.log('[AnthropicProvider] Configuring 智谱AI authentication');
+        createOptions.fetch = async (url: string, options: any) => {
+          // Convert x-api-key to Authorization header for 智谱AI
+          const headers = { ...options?.headers } as Record<string, string>;
+          const apiKey = headers['x-api-key'] || config.apiKey;
+
+          // Remove x-api-key and add Authorization header
+          delete headers['x-api-key'];
+          headers['Authorization'] = `Bearer ${apiKey}`;
+
+          console.log('[AnthropicProvider] Fetch URL:', url);
+          console.log('[AnthropicProvider] Using Authorization: Bearer', apiKey.substring(0, 10) + '...');
+
+          return fetch(url, { ...options, headers });
+        };
+      }
+    }
+
+    this.modelInstance = createAnthropic(createOptions)(config.model);
 
     this.model = config.model;
   }
@@ -297,6 +324,7 @@ export class AnthropicProvider implements AIProvider {
   }
 
   async *stream(messages: ChatMessage[], options?: CompletionOptions): AsyncIterable<StreamChunk> {
+    console.log('[AnthropicProvider] Starting stream with model:', this.model, 'baseURL:', this.config.baseURL);
     const validationResult = ChatMessageSchema.array().safeParse(messages);
     if (!validationResult.success) {
       throw new Error(`Invalid messages: ${validationResult.error.errors[0].message}`);
@@ -305,37 +333,73 @@ export class AnthropicProvider implements AIProvider {
     const coreMessages = convertToCoreMessages(messages);
     const vercelOptions = convertToVercelOptions(options);
 
-    const result = await streamText({
-      model: this.modelInstance,
-      messages: coreMessages,
-      ...vercelOptions,
-    });
+    console.log('[AnthropicProvider] Calling streamText with messages:', coreMessages.length, 'options:', vercelOptions);
 
-    for await (const chunk of result.textStream) {
-      yield {
-        content: chunk,
-        done: false,
-      };
-    }
+    try {
+      const result = await streamText({
+        model: this.modelInstance,
+        messages: coreMessages,
+        ...vercelOptions,
+      });
 
-    // Check if there are tool calls
-    const response = await result;
-    if (response.toolCalls && response.toolCalls.length > 0) {
+      console.log('[AnthropicProvider] streamText returned, type:', typeof result, 'hasTextStream:', !!result.textStream);
+
+      // Add full response logging for debugging
+      result.originalResponse?.then((resp: any) => {
+        console.log('[AnthropicProvider] Raw API response status:', resp?.status, 'headers:', resp?.headers);
+      }).catch((e: any) => {
+        console.error('[AnthropicProvider] Raw API response error:', e);
+      });
+
+      let chunkCount = 0;
+      console.log('[AnthropicProvider] Starting to iterate textStream...');
+
+      for await (const chunk of result.textStream) {
+        chunkCount++;
+        console.log('[AnthropicProvider] Chunk', chunkCount, ':', chunk);
+        yield {
+          content: chunk,
+          done: false,
+        };
+      }
+
+      console.log('[AnthropicProvider] Stream iteration completed. Total chunks:', chunkCount);
+
+      // Check if there are tool calls - await the full response
+      const response = await result;
+      const finalText = await response.text;
+      const finalUsage = await response.usage;
+      const finalFinishReason = await response.finishReason;
+
+      console.log('[AnthropicProvider] Final response:', {
+        text: typeof finalText,
+        textLength: finalText?.length || 0,
+        textPreview: finalText?.substring(0, 100) || '(empty)',
+        usage: finalUsage,
+        toolCalls: response.toolCalls?.length,
+        finishReason: finalFinishReason,
+      });
+
+      if (response.toolCalls && response.toolCalls.length > 0) {
+        yield {
+          content: '',
+          done: false,
+          toolCalls: response.toolCalls.map(tc => ({
+            id: tc.toolCallId,
+            name: tc.toolName,
+            arguments: tc.args,
+          })),
+        };
+      }
+
       yield {
         content: '',
-        done: false,
-        toolCalls: response.toolCalls.map(tc => ({
-          id: tc.toolCallId,
-          name: tc.toolName,
-          arguments: tc.args,
-        })),
+        done: true,
       };
+    } catch (error) {
+      console.error('[AnthropicProvider] Stream error:', error);
+      throw error;
     }
-
-    yield {
-      content: '',
-      done: true,
-    };
   }
 }
 
@@ -360,7 +424,7 @@ export class OpenAIProvider implements AIProvider {
       createOptions.baseURL = config.baseURL;
     }
 
-    this.modelInstance = openai(config.model, createOptions);
+    this.modelInstance = createOpenAI(createOptions)(config.model);
     this.model = config.model;
   }
 
@@ -477,9 +541,11 @@ export class GoogleProvider implements AIProvider {
     this.validateConfig(config);
     this.config = config;
 
-    this.modelInstance = google(config.model, {
+    const createOptions = {
       apiKey: config.apiKey,
-    });
+    };
+
+    this.modelInstance = createGoogleGenerativeAI(createOptions)(config.model);
 
     this.model = config.model;
   }
